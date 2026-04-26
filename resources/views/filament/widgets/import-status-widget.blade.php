@@ -1,98 +1,104 @@
 <x-filament-widgets::widget>
-    <x-filament::section>
-        <x-slot name="heading">آخر استيراد بيانات</x-slot>
-
-        @if($import)
-            @php
-                $statusColors = [
-                    'success'    => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-                    'failed'     => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-                    'processing' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-                    'pending'    => 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-                ];
-                $statusLabels = [
-                    'success'    => 'نجح ✓',
-                    'failed'     => 'فشل ✗',
-                    'processing' => 'جارٍ المعالجة...',
-                    'pending'    => 'في الانتظار',
-                ];
-                $statusColor = $statusColors[$import->status] ?? 'bg-gray-100 text-gray-800';
-                $statusLabel = $statusLabels[$import->status] ?? $import->status;
-            @endphp
-
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">تاريخ الاستيراد</p>
-                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                            {{ $import->data_date ? $import->data_date->format('d/m/Y') : 'غير محدد' }}
-                        </p>
+    <div style="direction: rtl; font-family: 'Rubik', sans-serif;">
+        <div style="background: #ffffff; border-radius: 1.25rem; border: 1px solid #f3f4f6; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); overflow: hidden;">
+            {{-- Header Line --}}
+            <div style="background: #f9fafb; padding: 1rem 1.5rem; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="background: #fff; padding: 0.5rem; border-radius: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex;">
+                        <x-heroicon-o-cloud-arrow-up style="width: 1.25rem; height: 1.25rem; color: #6366f1;"/>
                     </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">المصدر</p>
-                        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-full
-                            {{ $import->source_type === 'excel' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' }}">
-                            {{ strtoupper($import->source_type) }}
-                        </span>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">الحالة</p>
-                        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-full {{ $statusColor }}">
-                            {{ $statusLabel }}
-                        </span>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">تمت المعالجة</p>
-                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                            {{ number_format($import->total_agents ?? 0) }} وكيل
-                        </p>
-                    </div>
+                    <h3 style="font-size: 1rem; font-weight: 800; color: #111827; margin: 0;">آخر استيراد بيانات</h3>
                 </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <div class="text-center rounded-lg bg-emerald-50 dark:bg-emerald-900/30 px-3 py-2">
-                        <p class="text-lg font-bold text-emerald-700 dark:text-emerald-300">{{ number_format($import->processed ?? 0) }}</p>
-                        <p class="text-xs text-emerald-600 dark:text-emerald-400">مقبول</p>
-                    </div>
-                    <div class="text-center rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2">
-                        <p class="text-lg font-bold text-red-700 dark:text-red-300">{{ number_format($import->rejected ?? 0) }}</p>
-                        <p class="text-xs text-red-600 dark:text-red-400">مرفوض</p>
-                    </div>
-                    <div class="text-center rounded-lg bg-sky-50 dark:bg-sky-900/30 px-3 py-2">
-                        <p class="text-lg font-bold text-sky-700 dark:text-sky-300">{{ number_format($import->promotions_count ?? 0) }}</p>
-                        <p class="text-xs text-sky-600 dark:text-sky-400">ترقيات</p>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-2 shrink-0">
-                    <a href="{{ url('/admin/data-imports/' . $import->import_id) }}"
-                       class="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                        <x-heroicon-m-eye class="w-3.5 h-3.5"/>
-                        عرض التفاصيل
-                    </a>
-                    <a href="{{ url('/admin/data-imports/create') }}"
-                       class="inline-flex items-center justify-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition">
-                        <x-heroicon-m-arrow-up-tray class="w-3.5 h-3.5"/>
-                        رفع ملف جديد
-                    </a>
-                </div>
+                @if($import)
+                    <span style="font-size: 0.75rem; color: #6b7280; font-weight: 500;">
+                        تاريخ الملف: {{ $import->data_date ? $import->data_date->format('Y/m/d') : '---' }}
+                    </span>
+                @endif
             </div>
 
-            @if($import->error_message)
-                <div class="mt-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-2 text-sm text-red-700 dark:text-red-300">
-                    <strong>خطأ:</strong> {{ $import->error_message }}
-                </div>
-            @endif
-        @else
-            <div class="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-500">
-                <x-heroicon-o-arrow-up-tray class="w-10 h-10 mb-2"/>
-                <p class="text-sm">لا يوجد استيراد بعد</p>
-                <a href="{{ url('/admin/data-imports/create') }}"
-                   class="mt-3 inline-flex items-center gap-1 rounded-lg bg-primary-600 px-4 py-2 text-xs font-medium text-white hover:bg-primary-700 transition">
-                    <x-heroicon-m-arrow-up-tray class="w-3.5 h-3.5"/>
-                    رفع أول ملف
-                </a>
+            <div style="padding: 1.5rem;">
+                @if($import)
+                    @php
+                        $statusMeta = match($import->status) {
+                            'success'    => ['color' => '#10b981', 'bg' => '#ecfdf5', 'label' => 'نجح مكتمل', 'icon' => 'heroicon-m-check-circle'],
+                            'failed'     => ['color' => '#ef4444', 'bg' => '#fef2f2', 'label' => 'فشل الاستيراد', 'icon' => 'heroicon-m-x-circle'],
+                            'processing' => ['color' => '#3b82f6', 'bg' => '#eff6ff', 'label' => 'جارٍ المعالجة', 'icon' => 'heroicon-m-arrow-path'],
+                            default      => ['color' => '#f59e0b', 'bg' => '#fffbeb', 'label' => 'في الانتظار', 'icon' => 'heroicon-m-clock'],
+                        };
+                    @endphp
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; align-items: center;">
+                        {{-- Status & Source --}}
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="width: 3.5rem; height: 3.5rem; border-radius: 1rem; background: {{ $statusMeta['bg'] }}; color: {{ $statusMeta['color'] }}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <x-dynamic-component :component="$statusMeta['icon']" style="width: 2rem; height: 2rem;"/>
+                            </div>
+                            <div>
+                                <p style="font-size: 0.875rem; font-weight: 800; color: #111827; margin: 0;">{{ $statusMeta['label'] }}</p>
+                                <p style="font-size: 0.75rem; color: #6b7280; margin: 0;">مصدر البيانات: <span style="color: #3b82f6; font-weight: 700;">{{ strtoupper($import->source_type) }}</span></p>
+                            </div>
+                        </div>
+
+                        {{-- Stats Grid --}}
+                        <div style="display: flex; align-items: center; gap: 2rem; background: #f8fafc; padding: 1rem; border-radius: 1rem; border: 1px dashed #e2e8f0;">
+                            <div style="text-align: center; flex: 1;">
+                                <p style="font-size: 1.25rem; font-weight: 900; color: #059669; margin: 0;">{{ number_format($import->processed ?? 0) }}</p>
+                                <p style="font-size: 0.625rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-top: 0.25rem;">مقبول</p>
+                            </div>
+                            <div style="width: 1px; height: 2rem; background: #e2e8f0;"></div>
+                            <div style="text-align: center; flex: 1;">
+                                <p style="font-size: 1.25rem; font-weight: 900; color: #dc2626; margin: 0;">{{ number_format($import->rejected ?? 0) }}</p>
+                                <p style="font-size: 0.625rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-top: 0.25rem;">مرفوض</p>
+                            </div>
+                            <div style="width: 1px; height: 2rem; background: #e2e8f0;"></div>
+                            <div style="text-align: center; flex: 1;">
+                                <p style="font-size: 1.25rem; font-weight: 900; color: #0284c7; margin: 0;">{{ number_format($import->promotions_count ?? 0) }}</p>
+                                <p style="font-size: 0.625rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-top: 0.25rem;">ترقيات</p>
+                            </div>
+                        </div>
+
+                        {{-- Total & Info --}}
+                        <div style="text-align: left;">
+                            <p style="font-size: 0.75rem; color: #6b7280; font-weight: 500; margin-bottom: 0.25rem;">إجمالي السجلات المعالجة</p>
+                            <p style="font-size: 1.5rem; font-weight: 900; color: #111827; margin: 0;">{{ number_format($import->total_agents ?? 0) }} <span style="font-size: 0.875rem; font-weight: 500; color: #9ca3af;">وكيل</span></p>
+                        </div>
+
+                        {{-- Actions --}}
+                        <div style="display: flex; gap: 0.75rem; justify-content: flex-start;">
+                             <a href="{{ url('/admin/data-imports/' . $import->import_id) }}"
+                               style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.75rem; border: 1px solid #e5e7eb; background: #fff; color: #374151; font-size: 0.875rem; font-weight: 700; text-decoration: none; transition: all 0.2s;">
+                                <x-heroicon-m-eye style="width: 1rem; height: 1rem;"/>
+                                التفاصيل
+                            </a>
+                            <a href="{{ url('/admin/data-imports/create') }}"
+                               style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.75rem; background: #111827; color: #fff; font-size: 0.875rem; font-weight: 700; text-decoration: none; transition: all 0.2s;">
+                                <x-heroicon-m-arrow-up-tray style="width: 1rem; height: 1rem;"/>
+                                استيراد جديد
+                            </a>
+                        </div>
+                    </div>
+
+                    @if($import->error_message)
+                        <div style="margin-top: 1.5rem; padding: 1rem; border-radius: 0.75rem; background: #fff1f2; border: 1px solid #fecaca; color: #be123c; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <x-heroicon-m-exclamation-triangle style="width: 1.25rem; height: 1.25rem; flex-shrink: 0;"/>
+                            <strong>خطأ:</strong> {{ $import->error_message }}
+                        </div>
+                    @endif
+                @else
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 0; color: #9ca3af; text-align: center;">
+                        <div style="background: #f9fafb; padding: 1.5rem; border-radius: 50%; margin-bottom: 1rem;">
+                            <x-heroicon-o-document-plus style="width: 3rem; height: 3rem;"/>
+                        </div>
+                        <p style="font-size: 1rem; font-weight: 700; color: #374151; margin-bottom: 0.5rem;">لا توجد سجلات استيراد حالية</p>
+                        <p style="font-size: 0.875rem; margin-bottom: 1.5rem;">ابدأ برفع أول ملف إكسل لتحديث بيانات الوكلاء.</p>
+                        <a href="{{ url('/admin/data-imports/create') }}"
+                           style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 2rem; border-radius: 0.75rem; background: #111827; color: #fff; font-size: 0.875rem; font-weight: 700; text-decoration: none;">
+                            <x-heroicon-m-plus style="width: 1rem; height: 1rem;"/>
+                            رفع أول ملف
+                        </a>
+                    </div>
+                @endif
             </div>
-        @endif
-    </x-filament::section>
+        </div>
+    </div>
 </x-filament-widgets::widget>

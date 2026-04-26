@@ -34,23 +34,25 @@ class CampaignStatsOverview extends BaseWidget
         return [
             Stat::make('إجمالي الوكلاء', number_format($totalAgents))
                 ->description('إجمالي المسجلين في الحملة')
-                ->descriptionIcon('heroicon-m-users')
-                ->color('info'),
+                ->descriptionIcon('heroicon-m-user-group')
+                ->color('info')
+                ->chart([7, 3, 4, 5, 6, 3, 5, 3]),
 
             Stat::make('في الأندية', number_format($agentsInClubs))
-                ->description("{$agentsOutClubs} خارج الأندية")
-                ->descriptionIcon('heroicon-m-star')
-                ->color('success'),
+                ->description("{$agentsOutClubs} خارج الأندية حالياً")
+                ->descriptionIcon('heroicon-m-building-office-2')
+                ->color('success')
+                ->chart([2, 4, 3, 6, 4, 5, 4, 7]),
 
             Stat::make('أيام متبقية', number_format($daysRemaining))
-                ->description('حتى 30 أبريل 2027')
-                ->descriptionIcon('heroicon-m-calendar')
-                ->color($daysRemaining < 30 ? 'danger' : ($daysRemaining < 90 ? 'warning' : 'success')),
+                ->description('حتى انتهاء موسم 2026-2027')
+                ->descriptionIcon('heroicon-m-clock')
+                ->color($daysRemaining < 30 ? 'danger' : ($daysRemaining < 90 ? 'warning' : 'primary')),
 
-            Stat::make('نسبة الإنجاز', "{$progress}%")
-                ->description("مضى {$daysPassed} يوم من أصل {$totalDays}")
-                ->descriptionIcon('heroicon-m-chart-bar')
-                ->color('primary'),
+            Stat::make('نسبة الإنجاز الزمنية', "{$progress}%")
+                ->description("مضى {$daysPassed} يوم")
+                ->descriptionIcon('heroicon-m-presentation-chart-line')
+                ->color('gray'),
         ];
     }
 }

@@ -223,8 +223,7 @@ class AgentResource extends Resource
                 SelectFilter::make('current_club_id')
                     ->label('النادي')
                     ->options(Club::all()->pluck('club_name', 'club_id'))
-                    ->placeholder('كل الأندية')
-                    ->multiple(),
+                    ->placeholder('كل الأندية'),
 
                 TernaryFilter::make('is_first_arrival')
                     ->label('من الأوائل'),

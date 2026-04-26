@@ -30,6 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->font('Rubik')
             ->login()
             ->colors([
                 'primary' => Color::Sky,
@@ -38,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
                 'warning' => Color::Amber,
                 'info'    => Color::Blue,
             ])
-            ->brandName('حملة سكاي كلابز 2026-2027')
+            ->brandName('SKY CLUB')
             ->favicon(asset('favicon.ico'))
             ->discoverResources(app_path('Filament/Resources'), 'App\\Filament\\Resources')
             ->discoverPages(app_path('Filament/Pages'), 'App\\Filament\\Pages')
