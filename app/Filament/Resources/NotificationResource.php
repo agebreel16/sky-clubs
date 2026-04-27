@@ -40,11 +40,11 @@ class NotificationResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('agent.agent_name')
-                    ->label('Agent')
+                    ->label('الوكيل')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('notification_type')
-                    ->label('Type')
+                    ->label('النوع')
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
                         'promotion'   => 'success',
@@ -56,7 +56,7 @@ class NotificationResource extends Resource
                         default       => 'gray',
                     }),
                 TextColumn::make('title')
-                    ->label('Title')
+                    ->label('العنوان')
                     ->searchable()
                     ->limit(50),
                 TextColumn::make('category')
@@ -64,36 +64,36 @@ class NotificationResource extends Resource
                 TextColumn::make('stage')
                     ->default('—'),
                 TextColumn::make('club.club_name')
-                    ->label('Club')
+                    ->label('النادي')
                     ->default('—'),
                 IconColumn::make('is_read')
-                    ->label('Read')
+                    ->label('مقروء')
                     ->boolean(),
                 TextColumn::make('sent_at')
-                    ->label('Sent')
+                    ->label('تم الإرسال')
                     ->dateTime()
                     ->sortable(),
             ])
             ->defaultSort('sent_at', 'desc')
             ->filters([
                 SelectFilter::make('notification_type')
-                    ->label('Type')
+                    ->label('النوع')
                     ->options([
-                        'milestone'   => 'Milestone',
-                        'progress'    => 'Progress',
-                        'achievement' => 'Achievement',
-                        'promotion'   => 'Promotion',
-                        'demotion'    => 'Demotion',
-                        'warning'     => 'Warning',
+                        'milestone'   => 'معلم',
+                        'progress'    => 'التقدم',
+                        'achievement' => 'الإنجاز',
+                        'promotion'   => 'ترقية',
+                        'demotion'    => 'تهبيط',
+                        'warning'     => 'تحذير',
                     ]),
                 SelectFilter::make('category')
                     ->options([
-                        'outside_clubs' => 'Outside Clubs',
-                        'in_club'       => 'In Club',
+                        'outside_clubs' => 'خارج الأندية',
+                        'in_club'       => 'في النادي',
                     ]),
-                TernaryFilter::make('is_read')->label('Read Status'),
+                TernaryFilter::make('is_read')->label('حالة القراءة'),
                 SelectFilter::make('club_id')
-                    ->label('Club')
+                    ->label('النادي')
                     ->options(Club::all()->pluck('club_name', 'club_id')),
             ])
             ->actions([

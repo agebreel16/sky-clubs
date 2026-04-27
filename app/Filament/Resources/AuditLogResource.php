@@ -35,7 +35,7 @@ class AuditLogResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('user.name')
-                    ->label('User')
+                    ->label('المستخدم')
                     ->searchable()
                     ->default('System'),
                 TextColumn::make('action')
@@ -52,10 +52,10 @@ class AuditLogResource extends Resource
                         default        => 'gray',
                     }),
                 TextColumn::make('model_type')
-                    ->label('Model')
+                    ->label('النموذج')
                     ->badge(),
                 TextColumn::make('model_id')
-                    ->label('Record ID')
+                    ->label('معرف السجل')
                     ->limit(20)
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('description')
@@ -71,7 +71,7 @@ class AuditLogResource extends Resource
                     ->label('IP')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
-                    ->label('Timestamp')
+                    ->label('الوقت')
                     ->dateTime()
                     ->sortable(),
             ])
@@ -79,29 +79,29 @@ class AuditLogResource extends Resource
             ->filters([
                 SelectFilter::make('action')
                     ->options([
-                        'create'       => 'Create',
-                        'read'         => 'Read',
-                        'update'       => 'Update',
-                        'delete'       => 'Delete',
-                        'export'       => 'Export',
-                        'import'       => 'Import',
-                        'rollback'     => 'Rollback',
-                        'login'        => 'Login',
-                        'failed_login' => 'Failed Login',
+                        'create'       => 'إنشاء',
+                        'read'         => 'قراءة',
+                        'update'       => 'تحديث',
+                        'delete'       => 'حذف',
+                        'export'       => 'تصدير',
+                        'import'       => 'استيراد',
+                        'rollback'     => 'استرجاع',
+                        'login'        => 'تسجيل دخول',
+                        'failed_login' => 'فشل تسجيل الدخول',
                     ]),
                 SelectFilter::make('model_type')
-                    ->label('Model')
+                    ->label('النموذج')
                     ->options([
-                        'Agent'      => 'Agent',
-                        'Club'       => 'Club',
-                        'DataImport' => 'Data Import',
-                        'User'       => 'User',
-                        'Reward'     => 'Reward',
+                        'Agent'      => 'وكيل',
+                        'Club'       => 'نادي',
+                        'DataImport' => 'استيراد البيانات',
+                        'User'       => 'مستخدم',
+                        'Reward'     => 'مكافأة',
                     ]),
                 SelectFilter::make('status')
                     ->options([
-                        'success' => 'Success',
-                        'failure' => 'Failure',
+                        'success' => 'نجح',
+                        'failure' => 'فشل',
                     ]),
             ])
             ->actions([

@@ -37,7 +37,7 @@ class RewardResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
-            Section::make('Reward Details')
+            Section::make('تفاصيل المكافأة')
                 ->columns(2)
                 ->schema([
                     Select::make('agent_id')
@@ -45,7 +45,7 @@ class RewardResource extends Resource
                         ->searchable()
                         ->required(),
                     Select::make('club_id')
-                        ->label('Club')
+                        ->label('النادي')
                         ->options(Club::all()->pluck('club_name', 'club_id'))
                         ->required(),
                     TextInput::make('amount')
@@ -54,22 +54,22 @@ class RewardResource extends Resource
                         ->prefix('₪')
                         ->minValue(0),
                     Toggle::make('is_first_arrival')
-                        ->label('First Arrival Bonus'),
+                        ->label('مكافأة الحضور الأول'),
                 ]),
 
-            Section::make('Payment Status')
+            Section::make('حالة الدفع')
                 ->columns(2)
                 ->schema([
                     Select::make('payment_status')
                         ->options([
-                            'pending' => 'Pending',
-                            'paid'    => 'Paid',
-                            'failed'  => 'Failed',
+                            'pending' => 'معلق',
+                            'paid'    => 'مدفوع',
+                            'failed'  => 'فشل',
                         ])
                         ->required()
                         ->default('pending'),
                     DateTimePicker::make('paid_date')
-                        ->label('Paid Date')
+                        ->label('تاريخ الدفع')
                         ->nullable(),
                 ]),
         ]);
@@ -80,18 +80,18 @@ class RewardResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('agent.agent_name')
-                    ->label('Agent')
+                    ->label('الوكيل')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('club.club_name')
-                    ->label('Club')
+                    ->label('النادي')
                     ->badge(),
                 TextColumn::make('amount')
-                    ->label('Amount (NIS)')
+                    ->label('المبلغ (شيكل)')
                     ->money('ILS')
                     ->sortable(),
                 IconColumn::make('is_first_arrival')
-                    ->label('1st Arrival')
+                    ->label('الحضور الأول')
                     ->boolean(),
                 TextColumn::make('payment_status')
                     ->badge()
@@ -102,12 +102,12 @@ class RewardResource extends Resource
                         default   => 'gray',
                     }),
                 TextColumn::make('paid_date')
-                    ->label('Paid Date')
+                    ->label('تاريخ الدفع')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
-                    ->label('Created')
+                    ->label('تاريخ الإنشاء')
                     ->date()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -116,14 +116,14 @@ class RewardResource extends Resource
             ->filters([
                 SelectFilter::make('payment_status')
                     ->options([
-                        'pending' => 'Pending',
-                        'paid'    => 'Paid',
-                        'failed'  => 'Failed',
+                        'pending' => 'معلق',
+                        'paid'    => 'مدفوع',
+                        'failed'  => 'فشل',
                     ]),
                 SelectFilter::make('club_id')
-                    ->label('Club')
+                    ->label('النادي')
                     ->options(Club::all()->pluck('club_name', 'club_id')),
-                TernaryFilter::make('is_first_arrival')->label('First Arrival'),
+                TernaryFilter::make('is_first_arrival')->label('الحضور الأول'),
             ])
             ->actions([
                 ViewAction::make(),

@@ -25,21 +25,21 @@
 
                     // Manual CSS Gradients based on metadata
                     $gradientCss = match($club->club_name) {
-                        'Launch Club'     => 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
-                        'Excellence Club' => 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)',
-                        'Peak Club'       => 'linear-gradient(135deg, #4338ca 0%, #8b5cf6 100%)',
+                        'نادي الإنطلاق'     => 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
+                        'نادي التفوق' => 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)',
+                        'نادي القمة'       => 'linear-gradient(135deg, #4338ca 0%, #8b5cf6 100%)',
                         default           => 'linear-gradient(135deg, #4b5563 0%, #9ca3af 100%)',
                     };
                     $shadowColor = match($club->club_name) {
-                        'Launch Club'     => 'rgba(37, 99, 235, 0.2)',
-                        'Excellence Club' => 'rgba(217, 119, 6, 0.2)',
-                        'Peak Club'       => 'rgba(67, 56, 202, 0.2)',
+                        'نادي الإنطلاق'     => 'rgba(37, 99, 235, 0.2)',
+                        'نادي التفوق' => 'rgba(217, 119, 6, 0.2)',
+                        'نادي القمة'       => 'rgba(67, 56, 202, 0.2)',
                         default           => 'rgba(75, 85, 99, 0.2)',
                     };
                     $textColor = match($club->club_name) {
-                        'Launch Club'     => '#2563eb',
-                        'Excellence Club' => '#d97706',
-                        'Peak Club'       => '#4338ca',
+                        'نادي الإنطلاق'     => '#2563eb',
+                        'نادي التفوق' => '#d97706',
+                        'نادي القمة'       => '#4338ca',
                         default           => '#4b5563',
                     };
                 @endphp

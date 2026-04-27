@@ -36,7 +36,7 @@ class OpportunityResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
-            Section::make('Opportunity Details')
+            Section::make('تفاصيل الفرصة')
                 ->columns(2)
                 ->schema([
                     Select::make('agent_id')
@@ -44,21 +44,21 @@ class OpportunityResource extends Resource
                         ->searchable()
                         ->required(),
                     Select::make('club_id')
-                        ->label('Club')
+                        ->label('النادي')
                         ->options(Club::all()->pluck('club_name', 'club_id'))
                         ->required(),
                     Select::make('type')
                         ->options([
-                            'entry'         => 'Entry',
-                            'maintenance'   => 'Maintenance',
-                            'bonus'         => 'Bonus',
-                            'first_arrival' => 'First Arrival',
+                            'entry'         => 'دخول',
+                            'maintenance'   => 'صيانة',
+                            'bonus'         => 'مكافأة',
+                            'first_arrival' => 'الحضور الأول',
                         ])
                         ->required(),
                     DateTimePicker::make('earned_date')
                         ->required(),
                     Toggle::make('is_active')
-                        ->label('Active (not cancelled)')
+                        ->label('نشطة (غير ملغاة)')
                         ->default(true),
                     TextInput::make('cancellation_reason')
                         ->maxLength(500)
@@ -72,11 +72,11 @@ class OpportunityResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('agent.agent_name')
-                    ->label('Agent')
+                    ->label('الوكيل')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('club.club_name')
-                    ->label('Club')
+                    ->label('النادي')
                     ->badge()
                     ->sortable(),
                 TextColumn::make('type')
@@ -89,14 +89,14 @@ class OpportunityResource extends Resource
                         default         => 'gray',
                     }),
                 TextColumn::make('earned_date')
-                    ->label('Earned')
+                    ->label('تاريخ الكسب')
                     ->dateTime()
                     ->sortable(),
                 IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label('نشطة')
                     ->boolean(),
                 TextColumn::make('cancellation_reason')
-                    ->label('Cancellation')
+                    ->label('سبب الإلغاء')
                     ->limit(40)
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -104,15 +104,15 @@ class OpportunityResource extends Resource
             ->filters([
                 SelectFilter::make('type')
                     ->options([
-                        'entry'         => 'Entry',
-                        'maintenance'   => 'Maintenance',
-                        'bonus'         => 'Bonus',
-                        'first_arrival' => 'First Arrival',
+                        'entry'         => 'دخول',
+                        'maintenance'   => 'صيانة',
+                        'bonus'         => 'مكافأة',
+                        'first_arrival' => 'الحضور الأول',
                     ]),
                 SelectFilter::make('club_id')
-                    ->label('Club')
+                    ->label('النادي')
                     ->options(Club::all()->pluck('club_name', 'club_id')),
-                TernaryFilter::make('is_active')->label('Status'),
+                TernaryFilter::make('is_active')->label('الحالة'),
             ])
             ->actions([
                 ViewAction::make(),

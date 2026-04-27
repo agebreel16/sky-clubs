@@ -36,7 +36,7 @@ class UserResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
-            Section::make('Personal Information')
+            Section::make('المعلومات الشخصية')
                 ->columns(2)
                 ->schema([
                     TextInput::make('name')
@@ -48,7 +48,7 @@ class UserResource extends Resource
                         ->unique(ignoreRecord: true)
                         ->maxLength(255),
                     TextInput::make('employee_id')
-                        ->label('Employee ID')
+                        ->label('معرف الموظف')
                         ->unique(ignoreRecord: true)
                         ->nullable()
                         ->maxLength(50),
@@ -61,32 +61,32 @@ class UserResource extends Resource
                         ->maxLength(100),
                 ]),
 
-            Section::make('Role & Department')
+            Section::make('الدور والقسم')
                 ->columns(2)
                 ->schema([
                     Select::make('role')
                         ->options([
-                            'super_admin'    => 'Super Admin',
-                            'admin'          => 'Admin',
-                            'supervisor'     => 'Supervisor',
-                            'data_entry'     => 'Data Entry',
-                            'viewer'         => 'Viewer',
-                            'finance_officer' => 'Finance Officer',
+                            'super_admin'    => 'مسؤول عام',
+                            'admin'          => 'مسؤول',
+                            'supervisor'     => 'مشرف',
+                            'data_entry'     => 'إدخال البيانات',
+                            'viewer'         => 'عارض',
+                            'finance_officer' => 'مسؤول مالي',
                         ])
                         ->required(),
                     Select::make('department')
                         ->options([
-                            'admin'      => 'Admin',
-                            'supervisor' => 'Supervisor',
-                            'data_entry' => 'Data Entry',
-                            'finance'    => 'Finance',
-                            'support'    => 'Support',
+                            'admin'      => 'إدارة',
+                            'supervisor' => 'إشراف',
+                            'data_entry' => 'إدخال البيانات',
+                            'finance'    => 'مالية',
+                            'support'    => 'دعم',
                         ])
                         ->required()
                         ->default('data_entry'),
                 ]),
 
-            Section::make('Authentication')
+            Section::make('المصادقة')
                 ->columns(2)
                 ->schema([
                     TextInput::make('password')
@@ -96,20 +96,20 @@ class UserResource extends Resource
                         ->dehydrated(fn ($state) => filled($state))
                         ->minLength(8),
                     TextInput::make('email_verified_at')
-                        ->label('Email Verified At')
+                        ->label('البريد مُتحقق منه في')
                         ->disabled()
                         ->dehydrated(false)
                         ->visibleOn('edit'),
                 ]),
 
-            Section::make('Account Status')
+            Section::make('حالة الحساب')
                 ->columns(2)
                 ->schema([
                     Toggle::make('is_active')
-                        ->label('Active Account')
+                        ->label('حساب نشط')
                         ->default(true),
                     Toggle::make('requires_password_change')
-                        ->label('Force Password Change'),
+                        ->label('فرض تغيير كلمة المرور'),
                 ]),
         ]);
     }
@@ -141,15 +141,15 @@ class UserResource extends Resource
                 TextColumn::make('position')
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label('نشط')
                     ->boolean(),
                 TextColumn::make('last_login_at')
-                    ->label('Last Login')
+                    ->label('آخر تسجيل دخول')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
-                    ->label('Created')
+                    ->label('تاريخ الإنشاء')
                     ->date()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -158,22 +158,22 @@ class UserResource extends Resource
             ->filters([
                 SelectFilter::make('role')
                     ->options([
-                        'super_admin'     => 'Super Admin',
-                        'admin'           => 'Admin',
-                        'supervisor'      => 'Supervisor',
-                        'data_entry'      => 'Data Entry',
-                        'viewer'          => 'Viewer',
-                        'finance_officer' => 'Finance Officer',
+                        'super_admin'     => 'مسؤول عام',
+                        'admin'           => 'مسؤول',
+                        'supervisor'      => 'مشرف',
+                        'data_entry'      => 'إدخال البيانات',
+                        'viewer'          => 'عارض',
+                        'finance_officer' => 'مسؤول مالي',
                     ]),
                 SelectFilter::make('department')
                     ->options([
-                        'admin'      => 'Admin',
-                        'supervisor' => 'Supervisor',
-                        'data_entry' => 'Data Entry',
-                        'finance'    => 'Finance',
-                        'support'    => 'Support',
+                        'admin'      => 'إدارة',
+                        'supervisor' => 'إشراف',
+                        'data_entry' => 'إدخال البيانات',
+                        'finance'    => 'مالية',
+                        'support'    => 'دعم',
                     ]),
-                TernaryFilter::make('is_active')->label('Status'),
+                TernaryFilter::make('is_active')->label('الحالة'),
             ])
             ->actions([
                 ViewAction::make(),

@@ -36,7 +36,7 @@ class ClubResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
-            Section::make('Club Identity')
+            Section::make('هوية النادي')
                 ->columns(2)
                 ->schema([
                     TextInput::make('club_name')
@@ -49,23 +49,23 @@ class ClubResource extends Resource
                         ->minValue(1),
                 ]),
 
-            Section::make('Qualification Thresholds')
+            Section::make('عتبات التأهيل')
                 ->columns(3)
                 ->schema([
                     TextInput::make('required_increase')
-                        ->label('Required New Lines')
+                        ->label('الأسطر الجديدة المطلوبة')
                         ->required()
                         ->integer()
                         ->minValue(1)
-                        ->suffix('lines'),
+                        ->suffix('أسطر'),
                     TextInput::make('required_transfer_count')
-                        ->label('Min Transfer Lines')
+                        ->label('الحد الأدنى من أسطر التحويل')
                         ->required()
                         ->integer()
                         ->minValue(1)
-                        ->suffix('lines'),
+                        ->suffix('أسطر'),
                     TextInput::make('required_transfer_percentage')
-                        ->label('Transfer % (60% Rule)')
+                        ->label('نسبة التحويل (قاعدة 60%)')
                         ->required()
                         ->numeric()
                         ->minValue(0)
@@ -73,73 +73,73 @@ class ClubResource extends Resource
                         ->step(0.01),
                 ]),
 
-            Section::make('Reward Configuration')
+            Section::make('إعدادات المكافآت')
                 ->columns(3)
                 ->schema([
                     TextInput::make('base_reward_amount')
-                        ->label('Entry Reward (NIS)')
+                        ->label('مكافأة الدخول (شيكل)')
                         ->required()
                         ->numeric()
                         ->minValue(0)
                         ->prefix('₪'),
                     TextInput::make('first_arrival_reward_amount')
-                        ->label('First Arrival Reward (NIS)')
+                        ->label('مكافأة الحضور الأول (شيكل)')
                         ->required()
                         ->numeric()
                         ->minValue(0)
                         ->prefix('₪'),
                     TextInput::make('first_arrival_count')
-                        ->label('First Arrival Slots')
+                        ->label('مقاعد الحضور الأول')
                         ->required()
                         ->integer()
                         ->minValue(1),
                 ]),
 
-            Section::make('Lottery Configuration')
+            Section::make('إعدادات اليانصيب')
                 ->columns(3)
                 ->schema([
                     TextInput::make('seat_capacity')
-                        ->label('Min Agents to Unlock Draw')
+                        ->label('الحد الأدنى من الوكلاء لفتح السحب')
                         ->required()
                         ->integer()
                         ->minValue(1),
                     TextInput::make('grand_prize_amount')
-                        ->label('Grand Prize (NIS)')
+                        ->label('الجائزة الكبرى (شيكل)')
                         ->required()
                         ->numeric()
                         ->minValue(0)
                         ->prefix('₪'),
                     TextInput::make('entry_opportunities')
-                        ->label('Entry Lottery Tickets')
+                        ->label('تذاكر السحب')
                         ->required()
                         ->integer()
                         ->minValue(1),
                 ]),
 
-            Section::make('Demotion & Bonus')
+            Section::make('التهبيط والمكافآت الإضافية')
                 ->columns(3)
                 ->schema([
                     TextInput::make('demotion_timer_days')
-                        ->label('Demotion Timer (days)')
+                        ->label('عداد التهبيط (أيام)')
                         ->required()
                         ->integer()
                         ->minValue(1)
-                        ->suffix('days'),
+                        ->suffix('أيام'),
                     Toggle::make('has_bonus_opportunities')
-                        ->label('Has Bonus Opportunities')
+                        ->label('يوجد فرص مكافآت')
                         ->reactive(),
                     TextInput::make('bonus_per_numbers')
-                        ->label('Lines per Bonus Ticket')
+                        ->label('الأسطر لكل تذكرة مكافأة')
                         ->integer()
                         ->minValue(1)
                         ->nullable()
                         ->hidden(fn ($get) => ! $get('has_bonus_opportunities')),
                 ]),
 
-            Section::make('Status')
+            Section::make('الحالة')
                 ->schema([
                     Toggle::make('is_active')
-                        ->label('Active')
+                        ->label('نشط')
                         ->default(true),
                 ]),
         ]);
@@ -154,38 +154,38 @@ class ClubResource extends Resource
                     ->sortable()
                     ->width('50px'),
                 TextColumn::make('club_name')
-                    ->label('Club')
+                    ->label('النادي')
                     ->searchable()
                     ->weight('bold'),
                 TextColumn::make('required_increase')
-                    ->label('Required Lines')
-                    ->suffix(' lines')
+                    ->label('الأسطر المطلوبة')
+                    ->suffix(' أسطر')
                     ->sortable(),
                 TextColumn::make('base_reward_amount')
-                    ->label('Entry Reward')
+                    ->label('مكافأة الدخول')
                     ->money('ILS')
                     ->sortable(),
                 TextColumn::make('first_arrival_reward_amount')
-                    ->label('1st Arrival Reward')
+                    ->label('مكافأة الحضور الأول')
                     ->money('ILS'),
                 TextColumn::make('grand_prize_amount')
-                    ->label('Grand Prize')
+                    ->label('الجائزة الكبرى')
                     ->money('ILS')
                     ->sortable(),
                 TextColumn::make('seat_capacity')
-                    ->label('Min for Draw')
-                    ->suffix(' agents'),
+                    ->label('الحد الأدنى للسحب')
+                    ->suffix(' وكلاء'),
                 TextColumn::make('agents_count')
-                    ->label('Current Members')
+                    ->label('الأعضاء الحاليين')
                     ->counts('agents')
                     ->sortable(),
                 IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label('نشط')
                     ->boolean(),
             ])
             ->defaultSort('club_order')
             ->filters([
-                TernaryFilter::make('is_active')->label('Status'),
+                TernaryFilter::make('is_active')->label('الحالة'),
             ])
             ->actions([
                 ViewAction::make(),

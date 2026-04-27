@@ -38,34 +38,34 @@ class DailySnapshotResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('data_date')
-                    ->label('Date')
+                    ->label('التاريخ')
                     ->date()
                     ->sortable(),
                 TextColumn::make('agent.agent_name')
-                    ->label('Agent')
+                    ->label('الوكيل')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('club.club_name')
-                    ->label('Club on Date')
+                    ->label('النادي في التاريخ')
                     ->badge()
-                    ->default('No Club'),
+                    ->default('لا يوجد نادي'),
                 TextColumn::make('baseline_count')
-                    ->label('Baseline')
+                    ->label('الخط الأساسي')
                     ->sortable(),
                 TextColumn::make('pre_campaign_count')
-                    ->label('Pre-Campaign')
+                    ->label('قبل الحملة')
                     ->sortable(),
                 TextColumn::make('current_total')
-                    ->label('Total Lines')
+                    ->label('إجمالي الأسطر')
                     ->sortable(),
                 TextColumn::make('transfer_count')
-                    ->label('Transfers')
+                    ->label('التحويلات')
                     ->sortable(),
                 TextColumn::make('new_line_count')
-                    ->label('New Lines')
+                    ->label('أسطر جديدة')
                     ->sortable(),
                 TextColumn::make('created_at')
-                    ->label('Captured')
+                    ->label('تم الالتقاط')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -73,12 +73,12 @@ class DailySnapshotResource extends Resource
             ->defaultSort('data_date', 'desc')
             ->filters([
                 SelectFilter::make('club_id_at_date')
-                    ->label('Club on Date')
+                    ->label('النادي في التاريخ')
                     ->options(Club::all()->pluck('club_name', 'club_id')),
                 Filter::make('data_date')
                     ->form([
-                        DatePicker::make('from')->label('From Date'),
-                        DatePicker::make('until')->label('Until Date'),
+                        DatePicker::make('from')->label('من التاريخ'),
+                        DatePicker::make('until')->label('إلى التاريخ'),
                     ])
                     ->query(function ($query, array $data) {
                         return $query

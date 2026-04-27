@@ -36,11 +36,11 @@ class HistoryLogResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('agent.agent_name')
-                    ->label('Agent')
+                    ->label('الوكيل')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('event_type')
-                    ->label('Event')
+                    ->label('الحدث')
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
                         'promotion'   => 'success',
@@ -51,20 +51,20 @@ class HistoryLogResource extends Resource
                         default       => 'gray',
                     }),
                 TextColumn::make('fromClub.club_name')
-                    ->label('From Club')
+                    ->label('من النادي')
                     ->default('—'),
                 TextColumn::make('toClub.club_name')
-                    ->label('To Club')
+                    ->label('إلى النادي')
                     ->default('—'),
                 TextColumn::make('reason')
-                    ->label('Reason')
+                    ->label('السبب')
                     ->limit(60),
                 TextColumn::make('event_timestamp')
-                    ->label('Event Time')
+                    ->label('وقت الحدث')
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('created_at')
-                    ->label('Logged')
+                    ->label('تم التسجيل')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -72,19 +72,19 @@ class HistoryLogResource extends Resource
             ->defaultSort('event_timestamp', 'desc')
             ->filters([
                 SelectFilter::make('event_type')
-                    ->label('Event Type')
+                    ->label('نوع الحدث')
                     ->options([
-                        'promotion'   => 'Promotion',
-                        'demotion'    => 'Demotion',
-                        'warning'     => 'Warning',
-                        'achievement' => 'Achievement',
-                        'data_import' => 'Data Import',
+                        'promotion'   => 'ترقية',
+                        'demotion'    => 'تهبيط',
+                        'warning'     => 'تحذير',
+                        'achievement' => 'الإنجاز',
+                        'data_import' => 'استيراد البيانات',
                     ]),
                 SelectFilter::make('from_club_id')
-                    ->label('From Club')
+                    ->label('من النادي')
                     ->options(Club::all()->pluck('club_name', 'club_id')),
                 SelectFilter::make('to_club_id')
-                    ->label('To Club')
+                    ->label('إلى النادي')
                     ->options(Club::all()->pluck('club_name', 'club_id')),
             ])
             ->actions([
