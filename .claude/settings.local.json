@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(C:/laragon/bin/php/php-8.5.5-Win32-vs17-x64/php.exe c:/laragon/www/sky-clubs-campaign/artisan migrate:status)"
+      "Bash(C:/laragon/bin/php/php-8.5.5-Win32-vs17-x64/php.exe c:/laragon/www/sky-clubs-campaign/artisan migrate:status)",
+      "Bash(mysql -u root -e \"CREATE DATABASE IF NOT EXISTS sky_clubs_campaign CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; SHOW DATABASES LIKE 'sky_clubs_campaign';\")",
+      "Bash(php artisan *)"
     ]
   }
 }
