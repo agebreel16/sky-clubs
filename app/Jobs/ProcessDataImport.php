@@ -189,7 +189,7 @@ class ProcessDataImport implements ShouldQueue
                 'model_id'    => $agent->agent_id,
                 'old_values'  => array_intersect_key($agent->getOriginal(), $changes),
                 'new_values'  => $changes,
-                'ip_address'  => null,
+                'ip_address'  => '0.0.0.0',
                 'user_agent'  => 'import-job',
                 'description' => 'تحديث بيانات الوكيل عبر Import: ' . $this->import->import_id,
                 'status'      => 'success',
