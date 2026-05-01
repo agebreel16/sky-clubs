@@ -51,15 +51,17 @@ class ProcessDataImport implements ShouldQueue
             $stats['total'] = count($dataRows);
 
             DB::transaction(function () use ($dataRows, $clubs, &$stats) {
-                foreach ($dataRows as $rowIndex => $row) {
-                    try {
-                        $this->processAgentRow($row, $clubs, $stats);
-                    } catch (\Exception $e) {
-                        Log::error("Row {$rowIndex} error: " . $e->getMessage(), ['row' => $row]);
-                        $stats['errors']++;
-                        $stats['rejected']++;
+                Agent::withoutEvents(function () use ($dataRows, $clubs, &$stats) {
+                    foreach ($dataRows as $rowIndex => $row) {
+                        try {
+                            $this->processAgentRow($row, $clubs, $stats);
+                        } catch (\Exception $e) {
+                            Log::error("Row {$rowIndex} error: " . $e->getMessage(), ['row' => $row]);
+                            $stats['errors']++;
+                            $stats['rejected']++;
+                        }
                     }
-                }
+                });
             });
 
             $duration = (int) ((microtime(true) - $startTime) * 1000);
@@ -175,6 +177,24 @@ class ProcessDataImport implements ShouldQueue
             'transfer_count' => max(0, (int) $row['transfer_count']),
             'new_line_count' => max(0, (int) $row['new_line_count']),
         ]);
+
+        // AuditLog يدوي (Observer متوقف داخل withoutEvents)
+        $changes = $agent->getChanges();
+        unset($changes['updated_at']);
+        if (!empty($changes)) {
+            \App\Models\AuditLog::create([
+                'user_id'     => $this->import->uploaded_by,
+                'action'      => 'update',
+                'model_type'  => 'Agent',
+                'model_id'    => $agent->agent_id,
+                'old_values'  => array_intersect_key($agent->getOriginal(), $changes),
+                'new_values'  => $changes,
+                'ip_address'  => null,
+                'user_agent'  => 'import-job',
+                'description' => 'تحديث بيانات الوكيل عبر Import: ' . $this->import->import_id,
+                'status'      => 'success',
+            ]);
+        }
 
         // Save daily snapshot
         DailySnapshot::create([

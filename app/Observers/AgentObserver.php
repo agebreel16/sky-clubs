@@ -14,30 +14,25 @@ class AgentObserver
 {
     public function updated(Agent $agent): void
     {
-        // 1. Detect Club Change (Promotion / Demotion)
+        // 1. Detect Club Change (Promotion / Demotion) — للتعديل المباشر على current_club_id
         if ($agent->wasChanged('current_club_id')) {
             $this->handleClubChange($agent);
         }
 
-        // 2. Detect Demotion Timer Start (warning)
+        // 2. Detect Demotion Timer Start
         if ($agent->wasChanged('demotion_timer_start') && $agent->demotion_timer_start !== null) {
             $this->handleDemotionTimerStart($agent);
         }
 
-        // 3. Audit Log for manual changes
+        // 3. Audit Log (للتعديلات اليدوية — Import يعمل بـ withoutEvents فلا يصل هنا)
         $this->logAudit($agent);
 
-        // 4. After data update, check promotion/demotion eligibility
-        $trackedFields = ['current_total', 'transfer_count', 'new_line_count', 'pre_campaign_count'];
-        $hasDataChange = false;
-        foreach ($trackedFields as $field) {
-            if ($agent->wasChanged($field)) {
-                $hasDataChange = true;
-                break;
-            }
-        }
+        // 4. إعادة تقييم النادي إذا تغيّرت الأرقام (تعديل يدوي من Admin Panel)
+        $statsChanged = $agent->wasChanged([
+            'current_total', 'transfer_count', 'new_line_count', 'pre_campaign_count',
+        ]);
 
-        if ($hasDataChange) {
+        if ($statsChanged) {
             $this->checkAndApplyClubChanges($agent);
         }
     }
