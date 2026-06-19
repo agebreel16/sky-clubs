@@ -180,8 +180,8 @@ app/Providers/Filament/
 
 | Resource | Model | Panel | صلاحيات | Special Logic |
 |---|---|---|---|---|
-| `AgentResource` | `Agent` | Admin | `AgentPolicy` (User-typed) | `autoAssignClub()` عند الإنشاء/التعديل — يحسب النادي تلقائياً. `mutateFormDataBeforeCreate()` يحدد `current_club_id` |
-| `ClubChangeRequestResource` | `ClubChangeRequest` | Admin | — | صفحة مراجعة طلبات التغيير. Actions: قبول (Query Builder + Reward + Opportunity + إشعار ترقية فقط) / رفض (rejection_reason + خيار mark_as_violator للترقيات). canCreate()=false. Navigation badge يُظهر عدد المعلّق |
+| `AgentResource` | `Agent` | Admin | `AgentPolicy` (Authenticatable-typed + instanceof User guard) | `autoAssignClub()` عند الإنشاء/التعديل — يحسب النادي تلقائياً. `mutateFormDataBeforeCreate()` يحدد `current_club_id` |
+| `ClubChangeRequestResource` | `ClubChangeRequest` | Admin | — | صفحة مراجعة طلبات التغيير. Actions: قبول (Query Builder + Reward + Opportunity + إشعار ترقية فقط) / رفض (rejection_reason + خيار mark_as_violator للترقيات). **BulkAction** "قبول الترقيات المحددة" (promotion+pending فقط — التهبيط يبقى يدوياً). canCreate()=false. Navigation badge يُظهر عدد المعلّق |
 | `ClubResource` | `Club` | Admin | `ClubPolicy` | CRUD كامل — أي تعديل يؤثر فوراً على كل الحسابات |
 | `DistributorResource` | `Distributor` | Admin | — | `ViewDistributor` يتضمن `Action::make('assign_agents')` لتعيين وكلاء بالجملة |
 | `RewardResource` | `Reward` | Admin | `RewardPolicy` | تعديل `payment_status` (pending/paid/failed) |
@@ -231,7 +231,7 @@ app/Providers/Filament/
 
 **الملف:** `app/Jobs/ProcessDataImport.php`
 **التشغيل:** Queue (async) — يُطلق من `CreateDataImport::afterCreate()` أو يدوياً من `DataImportResource`.
-**Timeout:** 300 ثانية.
+**Timeout:** 300 ثانية · **Tries:** 1 (لا retry — يمنع تكرار AuditLog) · **failed():** يُحدِّث `import.status = 'failed'` كـ safety net.
 
 **مسار التنفيذ (الإصدار 2.0 — Approval Flow):**
 
@@ -242,6 +242,7 @@ handle()
   │    ├─ [excel] يقرأ xlsx — columns: [agent_id, current_total, transfer_count, new_line_count]
   │    └─ [api]   ->where('is_violator', false)  ← يستثني المخالفين من استعلام الوكلاء
   │
+  ├─ SET SESSION innodb_lock_wait_timeout = 5  ← يمنع تجميد الـ import إذا كان Admin يعدّل وكيلاً بالتزامن
   └─ DB::transaction()
        └─ Agent::withoutEvents(closure)   ← Observer مُعطَّل كلياً
             └─ foreach row → processAgentRow($row, $clubs, &$stats)
@@ -458,8 +459,8 @@ match($action) {
 
 | الملف | كيف يُطلق؟ | التفاصيل |
 |---|---|---|
-| `ProcessDataImport.php` | `CreateDataImport::afterCreate()` + يدوياً من `NumbersApiSettings` / `DealsApiSettings` / `SyncAgentDeals` | ShouldQueue · timeout=300s · تحديث إحصائيات وكلاء موجودين |
-| `ProcessAgentImport.php` | `CreateAgentImport::afterCreate()` + زر retry + `AgentsApiSettings::syncNow()` | ShouldQueue · timeout=300s · إنشاء وكلاء جدد من Excel أو API |
+| `ProcessDataImport.php` | `CreateDataImport::afterCreate()` + يدوياً من `NumbersApiSettings` / `DealsApiSettings` / `SyncAgentDeals` | ShouldQueue · timeout=300s · tries=1 · failed() safety net · تحديث إحصائيات وكلاء موجودين |
+| `ProcessAgentImport.php` | `CreateAgentImport::afterCreate()` + زر retry + `AgentsApiSettings::syncNow()` | ShouldQueue · timeout=300s · tries=1 · failed() safety net · إنشاء وكلاء جدد من Excel أو API |
 | `ProcessDistributorSync.php` | `DistributorsApiSettings::syncNow()` | ShouldQueue · timeout=120s · يجلب الموزعين من API خارجي (Bearer Token) → يُنشئ Distributor جديد لكل UUID غير موجود (skip إن موجود حتى مع SoftDelete). يدعم: `{"distributors":[]}` / `{"data":[]}` / `[...]`. يحفظ `last_distributor_sync` + `last_distributor_sync_result` في AppSetting |
 
 ### 5.3 Observers (`app/Observers/`)
@@ -796,43 +797,30 @@ Admin يفتح /admin/club-change-requests:
 | المخاطرة | الخطورة | التفاصيل |
 |---|---|---|
 | ~~**AgentNotification Missing Path**~~ | ✅ مُصلَح | `checkAndApplyPromotion()` يُنشئ `AgentNotification` + WebPush عند الترقية اليدوية. `ClubChangeRequestResource::approveRequest()` يُنشئ `AgentNotification` + WebPush عند قبول ترقية فقط. لا إشعار عند التهبيط أو الرفض أو المخالفة. |
-| **Missing DB-level Immutability** | 🟡 متوسطة | `HistoryLog` و`AuditLog` محمية بتعليق فقط، لا DB Trigger. أي `HistoryLog::where()->update()` مباشر في الكود سيمر بدون عائق. |
-| **Queue Worker Dependency** | 🟡 متوسطة | إذا توقف Queue Worker، كل imports ستبقى pending بصمت. لا alerting مدمج. |
-| **Transaction Locking** | 🟡 متوسطة | `DB::transaction()` في `ProcessDataImport` يُقفل صفوف `agents` لكامل مدة الاستيراد. إذا كان Admin يُعدِّل وكيلاً في نفس الوقت → `Lock wait timeout`. |
-| **AgentPolicy Type Mismatch** | 🟡 متوسطة | `AgentPolicy` مربوطة بـ `User` type-hint. الـ Distributor Panel يتجاوزها بـ `getAuthorizationResponse()` override — لكن أي resource جديد في Distributor Panel سينسى هذا ويقع في نفس الخطأ. |
-| **N+1 في ClubBreakdownWidget** | 🟠 منخفضة-متوسطة | `ClubBreakdownWidget` يُنفِّذ 4 queries لكل نادٍ (3 أندية = ~12 query). الآن مع `->where('is_violator', false)` على كل query. لا eager loading. |
-| **Approval Bottleneck** | 🟡 متوسطة | إذا اجتمع عدد كبير من الطلبات المعلّقة (import ضخم)، الأدمن يحتاج مراجعة يدوية لكل طلب. لا bulk approve حالياً — كل طلب يحتاج قراراً منفرداً. |
-| **`$agent->refresh()` في الـ Job** | 🟠 منخفضة | `$agent->refresh()` بعد `update()` يُعيد تحميل البيانات من DB — ضروري لأن `update()` لا يحدّث الـ instance تلقائياً. Observer لا يعمل هنا (withoutEvents) لذا لا تعارض، لكن أي `Agent::where()->update()` موازٍ من Admin في نفس اللحظة قد يُسبّب تقييماً على بيانات غير متسقة. |
-| **Bonus Opportunities لا تتحقق من Idempotency كافية** | 🟠 منخفضة | حساب Bonus يقارن `existing` بـ `bonusCount`، لكن إذا نُفِّذ Import مرتين في نفس اليوم بنفس البيانات، ستُنشأ فرص مكررة. |
+| ~~**Missing DB-level Immutability**~~ | ✅ مُصلَح (2026-06-19) | `HistoryLog` و`AuditLog` يرميان `LogicException` عند استدعاء `performUpdate()` أو `performDeleteOnModel()` — حماية حقيقية لا بتعليق فقط. |
+| **Queue Worker Dependency** | 🟡 متوسطة (مُحسَّن) | إذا توقف Queue Worker، كل imports ستبقى pending بصمت. لا alerting مدمج. **تحسين (2026-06-19):** `tries=1` + `failed()` تضمن تحديث `import.status = 'failed'` حتى عند الـ catastrophic failure قبل الـ try-catch. الحل الكامل (Slack/email alerting) لا يزال مفتوحاً. |
+| **Transaction Locking** | 🟡 متوسطة (مُخففة) | `DB::transaction()` في `ProcessDataImport` يُقفل صفوف `agents`. **تخفيف (2026-06-19):** `SET SESSION innodb_lock_wait_timeout = 5` يجعل تعارض الـ Admin يفشل في 5 ثوانٍ بدلاً من التجمّد 50 ثانية. الحل الجذري (per-row micro-transactions) مُؤجَّل. |
+| ~~**AgentPolicy Type Mismatch**~~ | ✅ مُصلَح (2026-06-19) | `AgentPolicy` محوّلة لـ `Authenticatable` type-hint مع `instanceof User` guard في كل method — أي Panel جديد يصل للـ Policy بـ non-User يحصل على `false` بدلاً من crash. |
+| ~~**N+1 في ClubBreakdownWidget**~~ | ✅ مُصلَح (2026-06-19) | من 13 query → 6 queries: query واحدة aggregate للأعداد + first_arrivals (per distributor)، query واحدة للأعداد الكلية، 3 queries لـ latestMember (1 لكل نادٍ). |
+| **Approval Bottleneck** | 🟢 مُعالَج جزئياً (2026-06-19) | **BulkAction** "قبول الترقيات المحددة" مُضاف — يعالج عدة ترقيات معلّقة دفعة واحدة مع try-catch per-record. التهبيط يبقى يدوياً عمداً (قرار حرج). |
+| **`$agent->refresh()` في الـ Job** | 🟠 منخفضة | `$agent->refresh()` بعد `update()` يُعيد تحميل البيانات من DB — ضروري لأن `update()` لا يحدّث الـ instance تلقائياً. Observer لا يعمل هنا (withoutEvents) لذا لا تعارض، لكن أي `Agent::where()->update()` موازٍ من Admin في نفس اللحظة قد يُسبّب تقييماً على بيانات غير متسقة. مُخفَّف بـ lock_wait_timeout=5. |
+| ~~**Bonus Opportunities لا تتحقق من Idempotency كافية**~~ | ✅ مُغلَق | قراءة الكود أثبتت أن الـ idempotency موجودة فعلاً: `$existing = count()` → `for ($i = $existing; $i < $bonusCount; $i++)` — لا تكرار حتى عند تشغيل Import مرتين. |
 
 ---
 
 ## 8. Technical Debt
 
-### TD-002: AgentPolicy مقيّدة بـ `User` فقط
+### ~~TD-002~~: ✅ مُصلَح — AgentPolicy محوّلة لـ `Authenticatable` (2026-06-19)
 
-**الوضع:** `AgentPolicy::view(User $user, ...)` — type-hint صريح.
-**التأثير:** أي Panel جديد يستخدم `Agent` model (غير Admin) سيحتاج bypass مماثل.
-**الحل المقترح:** تحويل type-hint إلى `Authenticatable` أو استخدام interface مشترك، أو إنشاء Policy منفصلة لكل Panel.
+**الوضع السابق:** `AgentPolicy::view(User $user, ...)` — type-hint صريح.
+**الإصلاح:** كل methods محوّلة لـ `Authenticatable $user` مع `instanceof User` guard → أي Panel جديد يصل للـ Policy بـ non-User يحصل على `false` بدلاً من PHP fatal error.
 
 ---
 
-### TD-003: Immutability بالاتفاق لا بالقيد
+### ~~TD-003~~: ✅ مُصلَح — Immutability بقيد حقيقي (2026-06-19)
 
-**الوضع:** `HistoryLog` و`AuditLog` محمية بتعليق `// Immutable` فقط.
-**الخطر:** مطوّر جديد يمكنه استدعاء `HistoryLog::where()->update()` بدون أي عائق.
-**الحل المقترح:**
-```php
-// في HistoryLog + AuditLog
-public function performUpdate(Builder $query): bool
-{
-    throw new \LogicException('HistoryLog is immutable.');
-}
-public function performDeleteOnModel(): bool
-{
-    throw new \LogicException('HistoryLog is immutable.');
-}
-```
+**الوضع السابق:** `HistoryLog` و`AuditLog` محمية بتعليق `// Immutable` فقط.
+**الإصلاح:** `performUpdate()` و`performDeleteOnModel()` في كلا الـ Model يرميان `LogicException` — حماية على مستوى Eloquent لا يمكن تجاوزها بالخطأ.
 
 ---
 
@@ -1275,4 +1263,5 @@ notifications() → agentNotifications()  // HasMany AgentNotification
 *آخر تحديث: 2026-05-23 — إصلاح إشعارات ProcessDataImport (TD-006): إضافة AgentNotification لكل الأحداث + $pendingNotifies pattern لإرسال WebPush/SMS بعد الـ transaction. إصلاح NotificationBell تزامن (TD-007). إصلاح AudioContext singleton (TD-008). تحديث §7.1 و§12.6. إصلاح شرط تأهيل النادي (TD-009): إضافة required_transfer_count للفلترة في AgentObserver + ProcessDataImport + AgentResource + CreateAgent — كان عداد التهبيط لا يبدأ عند نسبة تحويل < 60%. تحديث §4.4 و§6.4.*
 *آخر تحديث: 2026-05-23 (مراجعة نظام الإشعارات) — تصحيح اسم جدول `notifications` (كان خطأً `agent_notifications`) في §2.1. إضافة §2.1.1 بـ schema كامل لجدول notifications (15 حقل + indexes). تصحيح enum notification_type من 4 إلى 6 أنواع (milestone, progress). تحديث خريطة الأصوات في §12.5 (نغمة مختلفة لكل نوع). تحديث وصف NotificationBell في §12.4 (max 3 toasts، 6 أنواع). إضافة صف الفرصة الشهرية في جدول §12.6. إضافة §5.8 Console Commands (SyncDailyNumbers + CreateMonthlyMaintenanceOpportunities). إضافة AppSetting model في §5.1.*
 *آخر تحديث: 2026-06-09 (Deals API Auto-Sync + تدقيق شامل) — إضافة §5.5.1 صفحة `DealsApiSettings` (مزامنة أرقام الوكلاء). إضافة §12.3.1 `SyncStatusBadge` (client-driven auto-sync عبر Alpine.js). إضافة `SyncAgentDeals` في §5.8. توثيق `ProcessDistributorSync` job (§5.2). توثيق 4 صفحات API settings ناقصة (§5.5.1). إضافة `AgentsStatsWidget` (§3.3). تحديث DistributorOverviewWidget (§3.4). إضافة DistributorLogin (§3.5). توثيق 22 Blade file في §5.7 (كانت ناقصة). توسيع جدول AppSetting لـ 15 مفتاح مع الاستخدام (§5.8). تحديث DataImport schema (source_type=deals_api، progress، error_details، حذف unique constraint).*
+*آخر تحديث: 2026-06-19 (معالجة Bottlenecks §7.1) — إصلاح TD-002: AgentPolicy → Authenticatable + instanceof guard. إصلاح TD-003: HistoryLog + AuditLog → performUpdate/performDeleteOnModel يرميان LogicException. تحسين Queue Jobs: tries=1 + failed() safety net في ProcessDataImport + ProcessAgentImport. تخفيف Transaction Locking: SET SESSION innodb_lock_wait_timeout=5 قبل DB::transaction. إصلاح N+1 ClubBreakdownWidget: من 13 query → 6 queries. إضافة BulkAction "قبول الترقيات المحددة" في ClubChangeRequestResource. إغلاق Bonus Idempotency (كانت مُعالَجة فعلاً في الكود).*
 *يجب تحديثه عند أي تغيير جوهري في: ProcessDataImport، AgentObserver، بنية الـ Clubs، نظام المصادقة، Agent Portal، Console Commands المجدولة، أو SyncStatusBadge.*
