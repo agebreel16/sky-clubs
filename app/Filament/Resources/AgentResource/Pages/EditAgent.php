@@ -37,6 +37,24 @@ class EditAgent extends EditRecord
     public function form(Schema $schema): Schema
     {
         return $schema->schema([
+            Section::make('تحذير: وكيل مخالف')
+                ->columns(2)
+                ->hidden(fn ($record) => ! $record?->is_violator)
+                ->schema([
+                    Placeholder::make('violator_since_display')
+                        ->label('تاريخ التصنيف')
+                        ->content(fn ($record) => $record?->violator_since?->format('d/m/Y H:i') ?? '—'),
+
+                    Placeholder::make('violator_reason_display')
+                        ->label('سبب التصنيف')
+                        ->content(fn ($record) => $record?->violator_reason ?? '—'),
+
+                    Toggle::make('is_violator')
+                        ->label('إلغاء تصنيف المخالفة')
+                        ->helperText('أوقف هذا الخيار واحفظ لإعادة الوكيل للنظام الطبيعي')
+                        ->columnSpanFull(),
+                ]),
+
             Section::make('هوية الوكيل')
                 ->schema([
                     TextInput::make('agent_name')
