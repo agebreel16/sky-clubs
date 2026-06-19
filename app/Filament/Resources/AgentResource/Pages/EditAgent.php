@@ -40,6 +40,7 @@ class EditAgent extends EditRecord
             Section::make('تحذير: وكيل مخالف')
                 ->columns(2)
                 ->hidden(fn ($record) => ! $record?->is_violator)
+                ->extraAttributes(['class' => 'border-2 border-red-400 bg-red-50 dark:bg-red-950/30 dark:border-red-600'])
                 ->schema([
                     Placeholder::make('violator_since_display')
                         ->label('تاريخ التصنيف')
