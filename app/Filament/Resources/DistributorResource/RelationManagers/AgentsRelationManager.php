@@ -61,9 +61,9 @@ class AgentsRelationManager extends RelationManager
 
                 TextColumn::make('is_violator')
                     ->label('مخالف')
-                    ->formatStateUsing(fn ($state) => $state ? '⚠ مخالف' : '')
+                    ->formatStateUsing(fn ($state) => $state ? 'مخالف' : '—')
                     ->badge()
-                    ->color('danger'),
+                    ->color(fn ($state) => $state ? 'danger' : 'gray'),
 
                 IconColumn::make('is_first_arrival')
                     ->label('أوائل')

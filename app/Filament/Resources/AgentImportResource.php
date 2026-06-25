@@ -26,9 +26,9 @@ class AgentImportResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-user-plus'; }
 
-    public static function getNavigationGroup(): string { return 'إدارة الوكلاء'; }
+    public static function getNavigationGroup(): string { return 'البيانات والمزامنة'; }
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $slug = 'agent-imports';
 

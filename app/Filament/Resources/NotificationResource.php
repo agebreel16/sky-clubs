@@ -20,9 +20,9 @@ class NotificationResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-bell'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة البيانات'; }
+    public static function getNavigationGroup(): ?string { return 'السجلات'; }
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $label = 'إشعار';
 

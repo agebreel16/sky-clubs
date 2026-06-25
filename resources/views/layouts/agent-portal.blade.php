@@ -59,14 +59,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 5-7"/></svg>
             الأداء
         </a>
-        <a href="{{ route('agent.portal.notifications', $uuid) }}" class="tab {{ request()->routeIs('agent.portal.notifications') ? 'active' : '' }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-            الإشعارات
-            @php $unreadCount = $agent->agentNotifications()->where('is_read', false)->count(); @endphp
-            @if($unreadCount > 0)
-                <span class="pill-count">{{ $unreadCount }}</span>
-            @endif
-        </a>
         <a href="{{ route('agent.portal.rewards', $uuid) }}" class="tab {{ request()->routeIs('agent.portal.rewards') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="9"/><path d="M9 9h4.5a2.5 2.5 0 0 1 0 5H9V9z"/><path d="M9 14h5.5a2.5 2.5 0 0 1 0 5H9v-5z"/></svg>
             المكافآت
@@ -74,6 +66,14 @@
         <a href="{{ route('agent.portal.opportunities', $uuid) }}" class="tab {{ request()->routeIs('agent.portal.opportunities') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M9 6v12"/></svg>
             فرص السحب
+        </a>
+        <a href="{{ route('agent.portal.notifications', $uuid) }}" class="tab {{ request()->routeIs('agent.portal.notifications') ? 'active' : '' }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            الإشعارات
+            @php $unreadCount = $agent->agentNotifications()->where('is_read', false)->count(); @endphp
+            @if($unreadCount > 0)
+                <span class="pill-count">{{ $unreadCount }}</span>
+            @endif
         </a>
         <a href="{{ route('agent.portal.history', $uuid) }}" class="tab {{ request()->routeIs('agent.portal.history') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
@@ -96,6 +96,14 @@
         <div class="icon-w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 5-7"/></svg></div>
         <span>الأداء</span>
     </a>
+    <a href="{{ route('agent.portal.rewards', $uuid) }}" class="bottom-tab {{ request()->routeIs('agent.portal.rewards') ? 'active' : '' }}">
+        <div class="icon-w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="12" r="9"/><path d="M9 9h4.5a2.5 2.5 0 0 1 0 5H9V9z"/><path d="M9 14h5.5a2.5 2.5 0 0 1 0 5H9v-5z"/></svg></div>
+        <span>المكافآت</span>
+    </a>
+    <a href="{{ route('agent.portal.opportunities', $uuid) }}" class="bottom-tab {{ request()->routeIs('agent.portal.opportunities') ? 'active' : '' }}">
+        <div class="icon-w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M9 6v12"/></svg></div>
+        <span>فرص السحب</span>
+    </a>
     <a href="{{ route('agent.portal.notifications', $uuid) }}" class="bottom-tab {{ request()->routeIs('agent.portal.notifications') ? 'active' : '' }}">
         <div class="icon-w" style="position:relative;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -104,14 +112,6 @@
             @endif
         </div>
         <span>الإشعارات</span>
-    </a>
-    <a href="{{ route('agent.portal.rewards', $uuid) }}" class="bottom-tab {{ request()->routeIs('agent.portal.rewards') ? 'active' : '' }}">
-        <div class="icon-w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="12" r="9"/><path d="M9 9h4.5a2.5 2.5 0 0 1 0 5H9V9z"/><path d="M9 14h5.5a2.5 2.5 0 0 1 0 5H9v-5z"/></svg></div>
-        <span>المكافآت</span>
-    </a>
-    <a href="{{ route('agent.portal.opportunities', $uuid) }}" class="bottom-tab {{ request()->routeIs('agent.portal.opportunities') ? 'active' : '' }}">
-        <div class="icon-w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M9 6v12"/></svg></div>
-        <span>فرص السحب</span>
     </a>
     <a href="{{ route('agent.portal.history', $uuid) }}" class="bottom-tab {{ request()->routeIs('agent.portal.history') ? 'active' : '' }}">
         <div class="icon-w"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></div>

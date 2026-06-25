@@ -17,7 +17,7 @@ class AuditLogResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-shield-check'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة النظام'; }
+    public static function getNavigationGroup(): ?string { return 'السجلات'; }
 
     protected static ?int $navigationSort = 3;
 

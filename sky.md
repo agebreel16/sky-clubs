@@ -1,5 +1,5 @@
 # Sky Clubs Campaign — Technical Blueprint
-> **الإصدار:** 3.0 | **التاريخ:** 2026-06-20 | **الكاتب:** Lead Software Architect (AI)
+> **الإصدار:** 3.1 | **التاريخ:** 2026-06-25 | **الكاتب:** Lead Software Architect (AI)
 > **Stack:** Laravel 13 · Filament 5.6 · PHP 8.4 · MySQL 8.0 · Livewire 3
 
 ---
@@ -487,7 +487,7 @@ match($action) {
 |---|---|---|
 | `AgentResource.php` | `/admin/agents` | جدول + نموذج إنشاء/تعديل. الـ `autoAssignClub` يعمل live. عمود `is_violator` (أيقونة تحذير). تبويب "المخالفون" في ListAgents (is_violator=true فقط). فلتر `is_violator` بدلاً من فلتر العداد |
 | `AgentResource/Pages/CreateAgent.php` | `/admin/agents/create` | `mutateFormDataBeforeCreate` يحدد النادي تلقائياً |
-| `AgentResource/Pages/ViewAgent.php` | `/admin/agents/{id}` | infolist مفصّل: بيانات + إحصائيات + مخطط زمني (يومي/أسبوعي/شهري). Section "تحذير مخالف" إذا `is_violator=true` |
+| `AgentResource/Pages/ViewAgent.php` | `/admin/agents/{id}` | infolist مفصّل: بيانات + اسم الموزع (مرتبط بـ ViewDistributor) + إحصائيات. الترتيب في النادي `club_rank` يستخدم `transfer_count` فقط. Section "تحذير مخالف" إذا `is_violator=true` |
 | `AgentResource/Pages/EditAgent.php` | `/admin/agents/{id}/edit` | `baseline_count` مقفل. Section "حالة المخالفة" (مرئي فقط إذا `is_violator=true`) — Toggle لإلغاء المخالفة |
 | `AgentResource/RelationManagers/` | داخل ViewAgent | 3 RelationManagers: HistoryLogs + Opportunities + Rewards |
 | `ClubChangeRequestResource.php` | `/admin/club-change-requests` | مراجعة طلبات التغيير — قبول/رفض. Badge يعرض عدد المعلّق في شريط التنقل |
@@ -495,9 +495,9 @@ match($action) {
 | `ClubResource.php` | `/admin/clubs` | إعداد الأندية — أي تعديل يؤثر فوراً على كل الحسابات |
 | `DataImportResource.php` | `/admin/data-imports` | رفع Excel → يُطلق Job. زر "إعادة المعالجة" للفاشل — تحديث إحصائيات وكلاء موجودين |
 | `AgentImportResource.php` | `/admin/agent-imports` | استيراد وكلاء جدد من Excel أو API → يُطلق ProcessAgentImport Job |
-| `DistributorResource.php` | `/admin/distributors` | إدارة الموزعين + نموذج كلمة مرور |
+| `DistributorResource.php` | `/admin/distributors` | إدارة الموزعين + نموذج كلمة مرور. عمود `agents_count` يستخدم `->counts('agents')` (query واحدة لكل الجدول لا N+1). حقل `distributor_id` في AgentResource اختياري (nullable) |
 | `DistributorResource/Pages/ViewDistributor.php` | `/admin/distributors/{id}` | Action "تعيين وكلاء" بالجملة عبر multi-select modal |
-| `DistributorResource/RelationManagers/AgentsRelationManager.php` | داخل ViewDistributor | `AssociateAction` + `DissociateAction` لربط/فك وكلاء |
+| `DistributorResource/RelationManagers/AgentsRelationManager.php` | داخل ViewDistributor | `AssociateAction` + `DissociateAction` لربط/فك وكلاء. عمود `is_violator` يُظهر "مخالف" (أحمر) للمخالفين و"—" (رمادي) لغيرهم |
 | `RewardResource.php` | `/admin/rewards` | تعديل `payment_status`: pending → paid → failed |
 | `HistoryLogResource.php` | `/admin/history-logs` | قراءة فقط |
 | `AuditLogResource.php` | `/admin/audit-logs` | قراءة فقط |
@@ -571,7 +571,7 @@ match($action) {
 **Agent Resource:**
 | الملف | الوظيفة |
 |---|---|
-| `agent/daily-progress-chart.blade.php` | مخطط خطي (Chart.js 4.4.9 CDN) لزيادة الحملة اليومية في ViewAgent. أزرار يومي/أسبوعي/شهري client-side بـ vanilla JS عبر `@script`. ثلاثة datasets من `daily_snapshots` تُحسب في PHP |
+| ~~`agent/daily-progress-chart.blade.php`~~ | **محذوف** — المخطط الزمني للأداء حُذف من ViewAgent |
 | `agent/portal-link-modal.blade.php` | Modal مشاركة رابط بوابة الوكيل (Alpine.js زر نسخ) |
 
 **Distributor Panel:**
@@ -580,13 +580,7 @@ match($action) {
 | `distributor/widgets/club-breakdown-widget.blade.php` | توزيع وكلاء الموزع عبر الأندية |
 | `distributor/pages/my-profile.blade.php` | صفحة الملف الشخصي للموزع |
 
-**معادلة المخطط الزمني:**
-```
-campaign_increase (per day) = snapshot.transfer_count + snapshot.new_line_count
-```
-- الـ dataset الأسبوعي = آخر snapshot من كل أسبوع (`groupBy('Y-W')`)
-- الـ dataset الشهري = آخر snapshot من كل شهر (`groupBy('Y-m')`)
-- القسم مخفي تلقائياً إذا لم تكن هناك snapshots للوكيل
+~~**معادلة المخطط الزمني:**~~ **محذوف** — `daily-progress-chart.blade.php` وقسم Section المرتبط به في ViewAgent حُذفا بالكامل (2026-06-25). الـ AgentProgress Livewire component في بوابة الوكيل لا يزال يعرض الأداء الأسبوعي والشهري للوكيل ذاتياً.
 
 ### 5.8 Console Commands (`app/Console/Commands/`)
 
@@ -803,6 +797,7 @@ Admin يفتح /admin/club-change-requests:
 | **Transaction Locking** | 🟡 متوسطة (مُخففة) | `DB::transaction()` في `ProcessDataImport` يُقفل صفوف `agents`. **تخفيف (2026-06-19):** `SET SESSION innodb_lock_wait_timeout = 5` يجعل تعارض الـ Admin يفشل في 5 ثوانٍ بدلاً من التجمّد 50 ثانية. الحل الجذري (per-row micro-transactions) مُؤجَّل. |
 | ~~**AgentPolicy Type Mismatch**~~ | ✅ مُصلَح (2026-06-19) | `AgentPolicy` محوّلة لـ `Authenticatable` type-hint مع `instanceof User` guard في كل method — أي Panel جديد يصل للـ Policy بـ non-User يحصل على `false` بدلاً من crash. |
 | ~~**N+1 في ClubBreakdownWidget**~~ | ✅ مُصلَح (2026-06-19) | من 13 query → 6 queries: query واحدة aggregate للأعداد + first_arrivals (per distributor)، query واحدة للأعداد الكلية، 3 queries لـ latestMember (1 لكل نادٍ). |
+| ~~**N+1 في DistributorResource.table() — عمود agents_count**~~ | ✅ مُصلَح (2026-06-25) | كان يُشغِّل 3 queries لكل صف (getStateUsing + color closure مرتين). الآن `->counts('agents')` يُضيف withCount للـ Eloquent query → query واحدة إضافية لكل الجدول. |
 | **Approval Bottleneck** | 🟢 مُعالَج جزئياً (2026-06-19) | **BulkAction** "قبول الترقيات المحددة" مُضاف — يعالج عدة ترقيات معلّقة دفعة واحدة مع try-catch per-record. التهبيط يبقى يدوياً عمداً (قرار حرج). |
 | **Self-Sync API Latency** | 🟡 متوسطة | `ProcessAgentSelfSync` يستدعي Deals API synchronously (timeout=15s). إذا كان الـ API بطيئاً أو معطلاً → الوكيل ينتظر حتى 15 ثانية على صفحة المزامنة. الـ `updateSyncTime()` تُنفَّذ دائماً عند أي نتيجة → لا crash. لا fallback خارجي (retry أو alerting) حالياً. |
 | **`$agent->refresh()` في الـ Job** | 🟠 منخفضة | `$agent->refresh()` بعد `update()` يُعيد تحميل البيانات من DB — ضروري لأن `update()` لا يحدّث الـ instance تلقائياً. Observer لا يعمل هنا (withoutEvents) لذا لا تعارض، لكن أي `Agent::where()->update()` موازٍ من Admin في نفس اللحظة قد يُسبّب تقييماً على بيانات غير متسقة. مُخفَّف بـ lock_wait_timeout=5. |
@@ -868,6 +863,17 @@ Admin يفتح /admin/club-change-requests:
 **المشكلة:** `playPortalNotifSound()` كانت تُنشئ `new AudioContext()` في كل استدعاء. Chrome يسمح بـ 6 contexts كحد أقصى — الصوت يتوقف بعد الإشعار السادس.
 
 **الإصلاح:** `_portalAudioCtx` singleton على مستوى الـ page في `agent-portal.blade.php`.
+
+---
+
+### ~~TD-011~~: ✅ مُصلَح — إصلاحات لوحة الموزع وبوابة الوكيل (2026-06-25)
+
+**المشاكل المُصلَحة:**
+1. **N+1 في DistributorResource**: `agents_count` كان يُشغِّل 3 queries/صف → استُبدل بـ `->counts('agents')`.
+2. **Badge فارغ أحمر في RelationManager**: `is_violator=false` كان يُولِّد badge أحمر فارغ → الآن "مخالف" أحمر أو "—" رمادي.
+3. **ترتيب النادي في ViewAgent**: كان يستخدم `current_total` → الآن `transfer_count` (متسق مع بوابة الوكيل).
+4. **حقل الموزع مفقود في ViewAgent**: أُضيف `distributor.name` مع رابط مباشر للانتقال لـ ViewDistributor.
+5. **`distributor_id` مطلوب في نموذج Agent**: كان `->required()` بينما الـ DB يسمح بـ NULL → الآن `->nullable()` مع placeholder "بدون موزع".
 
 ---
 
@@ -1150,7 +1156,7 @@ Alpine.js tick() كل ثانية:
 |---|---|---|
 | `AgentPortalPage` | `app/Livewire/AgentPortal/AgentPortalPage.php` | Abstract base — يحمّل `$agent` + `renderWithLayout()` |
 | `AgentSyncing` | `AgentPortal/AgentSyncing.php` | صفحة المزامنة — `wire:init="runSync"` يُطلق `ProcessAgentSelfSync->handle()` synchronously. عند الانتهاء: redirect للـ dashboard. يُعرض spinner "جارٍ تحديث بياناتك..." خلال الانتظار (لا polling، لا queue) |
-| `AgentDashboard` | `AgentPortal/AgentDashboard.php` | KPIs + club badge. Banner احمر أعلى الصفحة إذا `$agent->is_violator` ("حسابك مُعلَّق من قِبَل الإدارة"). يُعرض "آخر مزامنة: X" إذا `last_self_sync_at` غير null |
+| `AgentDashboard` | `AgentPortal/AgentDashboard.php` | KPIs + club badge. Banner أحمر إذا `is_violator`. "آخر مزامنة: X" إذا `last_self_sync_at` موجود. **ميزات (2026-06-25):** (1) صف "إجمالي الزيادة" يُضمِّن تفصيل "تحويل: X • جديدة: Y" كسطر فرعي بدلاً من صف "الخطوط الجديدة" المستقل. (2) **بطاقة تحفيزية** للوكلاء خارج الأندية: 6 مراحل تلقائية (بداية → تقدم → منتصف → اقتراب → أبواب → مكتمل) بحسب أضعف شرط بين التحويل والخطوط الجديدة — نص تحفيزي ديناميكي + لون يعكس المرحلة. (3) **شريط الحالة الحي** ديناميكي 6 حالات: أعلى نادٍ / مؤهل للترقية / ركّز على التحويل / نسبة تحويل منخفضة / اقتربت / وضعك جيد — بدلاً من رسالة ثابتة. (4) ترتيب النادي `club_rank` يحسب بـ `transfer_count` فقط (لا يظهر العدد الكلي من X). (5) شريط التقدم يستخدم `max(required_increase)` لجميع الأندية كمقياس موحّد للامتلاء والعلامات الفارقة |
 | `AgentProgress` | `AgentPortal/AgentProgress.php` | 3 datasets من dailySnapshots — Alpine.js يُبدّل client-side |
 | `AgentNotifications` | `AgentPortal/AgentNotifications.php` | قائمة إشعارات مع `markRead()` + `markAllRead()` + filter |
 | `AgentRewards` | `AgentPortal/AgentRewards.php` | مكافآت مع payment_status badge |
@@ -1347,4 +1353,5 @@ ProcessAgentSelfSync::handle()
 *آخر تحديث: 2026-06-09 (Deals API Auto-Sync + تدقيق شامل) — إضافة §5.5.1 صفحة `DealsApiSettings` (مزامنة أرقام الوكلاء). إضافة §12.3.1 `SyncStatusBadge` (client-driven auto-sync عبر Alpine.js). إضافة `SyncAgentDeals` في §5.8. توثيق `ProcessDistributorSync` job (§5.2). توثيق 4 صفحات API settings ناقصة (§5.5.1). إضافة `AgentsStatsWidget` (§3.3). تحديث DistributorOverviewWidget (§3.4). إضافة DistributorLogin (§3.5). توثيق 22 Blade file في §5.7 (كانت ناقصة). توسيع جدول AppSetting لـ 15 مفتاح مع الاستخدام (§5.8). تحديث DataImport schema (source_type=deals_api، progress، error_details، حذف unique constraint).*
 *آخر تحديث: 2026-06-19 (معالجة Bottlenecks §7.1) — إصلاح TD-002: AgentPolicy → Authenticatable + instanceof guard. إصلاح TD-003: HistoryLog + AuditLog → performUpdate/performDeleteOnModel يرميان LogicException. تحسين Queue Jobs: tries=1 + failed() safety net في ProcessDataImport + ProcessAgentImport. تخفيف Transaction Locking: SET SESSION innodb_lock_wait_timeout=5 قبل DB::transaction. إصلاح N+1 ClubBreakdownWidget: من 13 query → 6 queries. إضافة BulkAction "قبول الترقيات المحددة" في ClubChangeRequestResource. إغلاق Bonus Idempotency (كانت مُعالَجة فعلاً في الكود).*
 *آخر تحديث: 2026-06-20 (الإصدار 3.0 — نظام Agent Self-Sync) — إضافة §12.10 شرح كامل لنظام المزامنة الذاتية. إضافة `ProcessAgentSelfSync` job (synchronous، لا queue) في §5.2. إضافة `AgentSyncing` Livewire component في §12.4. إضافة مسار `/syncing` في §12.3 (10 مسارات). تحديث Auth Flow في §12.2 (enter → /syncing → wire:init → dashboard). تحديث Agent Model §12.7 وجدول agents §2.1 بحقل `last_self_sync_at`. تحديث AppSetting §5.8 لإضافة `ProcessAgentSelfSync` في deals_api_*. إضافة مخاطرة Self-Sync API Latency في §7.1. إصلاحان حرجان: (1) `DailySnapshot.import_id NOT NULL` → استخدام `update()` لا `updateOrCreate()` — كان يمنع إنشاء ClubChangeRequest كلياً. (2) Queue dependency → wire:init synchronous pattern بلا queue worker.*
+*آخر تحديث: 2026-06-25 (الإصدار 3.1 — تحسينات بوابة الوكيل + إصلاحات لوحة الموزع) — بوابة الوكيل: دمج "الخطوط الجديدة" كسطر تفصيلي داخل "إجمالي الزيادة". بطاقة تحفيزية ديناميكية للوكلاء خارج الأندية (6 مراحل). شريط الحالة الحي بـ 6 حالات ديناميكية بدلاً من "وضعك جيد" الثابتة. إصلاح حساب ترتيب النادي (`transfer_count` بدل `current_total`، بدون إظهار العدد الكلي). إصلاح مقياس شريط التقدم (unified scale). حذف "المخطط الزمني للأداء" من ViewAgent + حذف `daily-progress-chart.blade.php`. لوحة الموزع: إصلاح N+1 في `agents_count` (`->counts('agents')`). إصلاح badge الفارغ في RelationManager. إضافة حقل الموزع في ViewAgent مع رابط. جعل `distributor_id` اختيارياً في نموذج Agent. تحديث §3.2، §5.5، §5.7، §7.1، §8، §12.4.*
 *يجب تحديثه عند أي تغيير جوهري في: ProcessDataImport، AgentObserver، بنية الـ Clubs، نظام المصادقة، Agent Portal، Console Commands المجدولة، أو SyncStatusBadge.*

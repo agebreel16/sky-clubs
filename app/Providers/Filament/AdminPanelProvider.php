@@ -2,9 +2,13 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\CampaignFunnelWidget;
 use App\Filament\Widgets\CampaignStatsOverview;
 use App\Filament\Widgets\ClubStatusWidget;
 use App\Filament\Widgets\PendingChangesWidget;
+use App\Filament\Widgets\PriorityAlertsWidget;
+use App\Filament\Widgets\RewardsStatsWidget;
+use App\Filament\Widgets\WeeklyVelocityWidget;
 use App\Filament\Pages\AdminLogin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -71,8 +75,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(app_path('Filament/Widgets'), 'App\\Filament\\Widgets')
             ->widgets([
+                PriorityAlertsWidget::class,
                 CampaignStatsOverview::class,
                 ClubStatusWidget::class,
+                CampaignFunnelWidget::class,
+                RewardsStatsWidget::class,
                 PendingChangesWidget::class,
             ])
             ->middleware([
@@ -90,11 +97,12 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->navigationGroups([
-                'إدارة الوكلاء',
-                'إدارة الحملة',
-                'إدارة البيانات',
-                'إدارة النظام',
-                'إعدادات API',
+                'العمليات',
+                'الوكلاء',
+                'الأندية',
+                'البيانات والمزامنة',
+                'السجلات',
+                'النظام',
             ]);
     }
 }

@@ -30,7 +30,7 @@ class OpportunitiesRelationManager extends RelationManager
                     })
                     ->formatStateUsing(function (string $state): string {
                         if ($state === 'entry')         { return 'دخول'; }
-                        if ($state === 'maintenance')   { return 'صيانة'; }
+                        if ($state === 'maintenance')   { return 'محافظة شهرية'; }
                         if ($state === 'bonus')         { return 'مكافأة'; }
                         if ($state === 'first_arrival') { return 'أوائل'; }
                         return $state;

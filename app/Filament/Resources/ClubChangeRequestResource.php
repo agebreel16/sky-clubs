@@ -29,11 +29,11 @@ class ClubChangeRequestResource extends Resource
     protected static ?string $model = ClubChangeRequest::class;
 
     public static function getNavigationIcon(): string { return 'heroicon-o-clipboard-document-check'; }
-    public static function getNavigationGroup(): string { return 'إدارة الحملة'; }
+    public static function getNavigationGroup(): string { return 'العمليات'; }
     public static function getNavigationLabel(): string { return 'طلبات تغيير النادي'; }
     public static function getModelLabel(): string { return 'طلب تغيير النادي'; }
     public static function getPluralModelLabel(): string { return 'طلبات تغيير النادي'; }
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     public static function getNavigationBadge(): ?string
     {

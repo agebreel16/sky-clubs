@@ -15,9 +15,9 @@ class DealsApiSettings extends Page
     protected string $view = 'filament.pages.deals-api-settings';
 
     public static function getNavigationLabel(): string  { return 'مزامنة أرقام الوكلاء'; }
-    public static function getNavigationGroup(): ?string { return 'إعدادات API'; }
+    public static function getNavigationGroup(): ?string { return 'البيانات والمزامنة'; }
     public static function getNavigationIcon(): string   { return 'heroicon-o-phone'; }
-    public static function getNavigationSort(): ?int     { return 95; }
+    public static function getNavigationSort(): ?int     { return 3; }
     public function getTitle(): string                   { return 'إعدادات API خطوط الوكلاء'; }
 
     public ?string $deals_api_url             = 'https://sales.sky5g.net:8888/ipa/apis/json/internal/generic/v2';

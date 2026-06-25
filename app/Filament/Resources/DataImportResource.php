@@ -28,7 +28,7 @@ class DataImportResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-arrow-up-tray'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة البيانات'; }
+    public static function getNavigationGroup(): ?string { return 'البيانات والمزامنة'; }
 
     protected static ?int $navigationSort = 1;
 

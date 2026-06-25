@@ -18,9 +18,9 @@ class HistoryLogResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-clock'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة البيانات'; }
+    public static function getNavigationGroup(): ?string { return 'السجلات'; }
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $label = 'سجل الأحداث';
 

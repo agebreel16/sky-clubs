@@ -20,9 +20,9 @@ class DailySnapshotResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-camera'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة البيانات'; }
+    public static function getNavigationGroup(): ?string { return 'البيانات والمزامنة'; }
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $label = 'لقطة يومية';
 
@@ -56,13 +56,13 @@ class DailySnapshotResource extends Resource
                     ->label('قبل الحملة')
                     ->sortable(),
                 TextColumn::make('current_total')
-                    ->label('إجمالي الأسطر')
+                    ->label('إجمالي الخطوط')
                     ->sortable(),
                 TextColumn::make('transfer_count')
                     ->label('التحويلات')
                     ->sortable(),
                 TextColumn::make('new_line_count')
-                    ->label('أسطر جديدة')
+                    ->label('خطوط جديدة')
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->label('تم الالتقاط')

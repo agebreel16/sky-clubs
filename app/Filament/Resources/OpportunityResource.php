@@ -25,7 +25,7 @@ class OpportunityResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-ticket'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة الحملة'; }
+    public static function getNavigationGroup(): ?string { return 'الأندية'; }
 
     protected static ?int $navigationSort = 2;
 
@@ -50,7 +50,7 @@ class OpportunityResource extends Resource
                     Select::make('type')
                         ->options([
                             'entry'         => 'دخول',
-                            'maintenance'   => 'صيانة',
+                            'maintenance'   => 'محافظة شهرية',
                             'bonus'         => 'مكافأة',
                             'first_arrival' => 'الحضور الأول',
                         ])
@@ -80,7 +80,15 @@ class OpportunityResource extends Resource
                     ->badge()
                     ->sortable(),
                 TextColumn::make('type')
+                    ->label('النوع')
                     ->badge()
+                    ->formatStateUsing(fn (string $state) => match ($state) {
+                        'entry'         => 'دخول',
+                        'maintenance'   => 'محافظة شهرية',
+                        'bonus'         => 'مكافأة',
+                        'first_arrival' => 'الحضور الأول',
+                        default         => $state,
+                    })
                     ->color(fn (string $state) => match ($state) {
                         'entry'         => 'success',
                         'maintenance'   => 'info',
@@ -105,7 +113,7 @@ class OpportunityResource extends Resource
                 SelectFilter::make('type')
                     ->options([
                         'entry'         => 'دخول',
-                        'maintenance'   => 'صيانة',
+                        'maintenance'   => 'محافظة شهرية',
                         'bonus'         => 'مكافأة',
                         'first_arrival' => 'الحضور الأول',
                     ]),

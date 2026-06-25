@@ -32,9 +32,9 @@ class AgentResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-users'; }
 
-    public static function getNavigationGroup(): string { return 'إدارة الوكلاء'; }
+    public static function getNavigationGroup(): string { return 'الوكلاء'; }
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $label = 'وكيل';
 
@@ -128,8 +128,8 @@ class AgentResource extends Resource
                         ->options(Distributor::where('is_active', true)->pluck('name', 'id'))
                         ->searchable()
                         ->preload()
-                        ->required()
-                        ->placeholder('اختر الموزع')
+                        ->nullable()
+                        ->placeholder('بدون موزع')
                         ->columnSpanFull(),
 
                     Select::make('current_club_id')

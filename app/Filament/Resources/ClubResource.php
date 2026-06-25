@@ -23,7 +23,7 @@ class ClubResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-star'; }
 
-    public static function getNavigationGroup(): ?string { return 'إدارة الحملة'; }
+    public static function getNavigationGroup(): ?string { return 'الأندية'; }
 
     protected static ?int $navigationSort = 1;
 
@@ -53,17 +53,17 @@ class ClubResource extends Resource
                 ->columns(3)
                 ->schema([
                     TextInput::make('required_increase')
-                        ->label('الأسطر الجديدة المطلوبة')
+                        ->label('الخطوط الجديدة المطلوبة')
                         ->required()
                         ->integer()
                         ->minValue(1)
-                        ->suffix('أسطر'),
+                        ->suffix('خطوط'),
                     TextInput::make('required_transfer_count')
-                        ->label('الحد الأدنى من أسطر التحويل')
+                        ->label('الحد الأدنى من خطوط التحويل')
                         ->required()
                         ->integer()
                         ->minValue(1)
-                        ->suffix('أسطر'),
+                        ->suffix('خطوط'),
                     TextInput::make('required_transfer_percentage')
                         ->label('نسبة التحويل (قاعدة 60%)')
                         ->required()
@@ -123,7 +123,7 @@ class ClubResource extends Resource
                         ->label('يوجد فرص مكافآت')
                         ->reactive(),
                     TextInput::make('bonus_per_numbers')
-                        ->label('الأسطر لكل تذكرة مكافأة')
+                        ->label('الخطوط لكل تذكرة مكافأة')
                         ->integer()
                         ->minValue(1)
                         ->nullable()
@@ -152,8 +152,8 @@ class ClubResource extends Resource
                     ->searchable()
                     ->weight('bold'),
                 TextColumn::make('required_increase')
-                    ->label('الأسطر المطلوبة')
-                    ->suffix(' أسطر')
+                    ->label('الخطوط المطلوبة')
+                    ->suffix(' خطوط')
                     ->sortable(),
                 TextColumn::make('base_reward_amount')
                     ->label('مكافأة الدخول')

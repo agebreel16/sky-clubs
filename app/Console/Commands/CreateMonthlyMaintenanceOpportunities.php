@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 class CreateMonthlyMaintenanceOpportunities extends Command
 {
     protected $signature   = 'app:monthly-maintenance-opportunities';
-    protected $description = 'منح فرصة سحب صيانة شهرية لكل وكيل محافظ على عضويته في نادٍ';
+    protected $description = 'منح فرصة محافظة شهرية لكل وكيل محافظ على عضويته في نادٍ';
 
     public function handle(): int
     {
@@ -64,7 +64,7 @@ class CreateMonthlyMaintenanceOpportunities extends Command
             $created++;
         }
 
-        $this->info("✓ شهر {$targetMonth->format('Y-m')}: منح {$created} فرصة صيانة.");
+        $this->info("✓ شهر {$targetMonth->format('Y-m')}: منح {$created} فرصة محافظة شهرية.");
 
         return self::SUCCESS;
     }

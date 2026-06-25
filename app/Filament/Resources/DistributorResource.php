@@ -27,7 +27,7 @@ class DistributorResource extends Resource
 
     public static function getNavigationIcon(): string { return 'heroicon-o-building-storefront'; }
 
-    public static function getNavigationGroup(): string { return 'إدارة الوكلاء'; }
+    public static function getNavigationGroup(): string { return 'الوكلاء'; }
 
     protected static ?int $navigationSort = 2;
 
@@ -137,12 +137,12 @@ class DistributorResource extends Resource
 
                 TextColumn::make('agents_count')
                     ->label('عدد الوكلاء')
-                    ->getStateUsing(fn (Distributor $record): int => $record->agents()->count())
+                    ->counts('agents')
                     ->badge()
-                    ->color(fn (Distributor $record): string => match (true) {
-                        $record->agents()->count() === 0 => 'gray',
-                        $record->agents()->count() < 5   => 'warning',
-                        default                          => 'success',
+                    ->color(fn ($state): string => match (true) {
+                        $state === 0 => 'gray',
+                        $state < 5   => 'warning',
+                        default      => 'success',
                     })
                     ->sortable(false),
 

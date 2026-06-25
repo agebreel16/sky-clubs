@@ -85,6 +85,15 @@ class ViewAgent extends ViewRecord
                             ->fontFamily('mono')
                             ->color('gray'),
 
+                        TextEntry::make('distributor.name')
+                            ->label('الموزع')
+                            ->default('—')
+                            ->badge()
+                            ->color('info')
+                            ->url(fn (Agent $record): ?string => $record->distributor_id
+                                ? \App\Filament\Resources\DistributorResource::getUrl('view', ['record' => $record->distributor_id])
+                                : null),
+
                         TextEntry::make('created_at')
                             ->label('تاريخ التسجيل')
                             ->dateTime('d/m/Y H:i')
@@ -131,7 +140,7 @@ class ViewAgent extends ViewRecord
                                 ->getStateUsing(function (Agent $record): string {
                                     if (!$record->current_club_id) return '—';
                                     $rank  = Agent::where('current_club_id', $record->current_club_id)
-                                        ->where('current_total', '>', $record->current_total)
+                                        ->where('transfer_count', '>', $record->transfer_count)
                                         ->count() + 1;
                                     $total = Agent::where('current_club_id', $record->current_club_id)->count();
                                     return "#{$rank} من {$total}";
@@ -261,41 +270,6 @@ class ViewAgent extends ViewRecord
                         ->columnSpanFull(),
                 ]),
 
-            // ── Row 5: Daily Progress Chart ────────────────────────────────────
-            Section::make('المخطط الزمني للأداء')
-                ->icon('heroicon-o-chart-bar')
-                ->iconColor('primary')
-                ->collapsible()
-                ->visible(fn (Agent $record): bool => $record->dailySnapshots()->exists())
-                ->schema([
-                    ViewEntry::make('daily_progress')
-                        ->view('filament.agent.daily-progress-chart')
-                        ->state(function (Agent $record): array {
-                            $all  = $record->dailySnapshots()
-                                ->orderBy('data_date')
-                                ->get(['data_date', 'current_total']);
-
-                            $daily = [
-                                'labels' => $all->map(fn ($s) => $s->data_date->format('d/m'))->toArray(),
-                                'data'   => $all->map(fn ($s) => $s->transfer_count + $s->new_line_count)->toArray(),
-                            ];
-
-                            $byWeek = $all->groupBy(fn ($s) => $s->data_date->format('Y-W'))->map->last()->values();
-                            $weekly = [
-                                'labels' => $byWeek->map(fn ($s) => $s->data_date->format('d/m'))->toArray(),
-                                'data'   => $byWeek->map(fn ($s) => $s->transfer_count + $s->new_line_count)->toArray(),
-                            ];
-
-                            $byMonth = $all->groupBy(fn ($s) => $s->data_date->format('Y-m'))->map->last()->values();
-                            $monthly = [
-                                'labels' => $byMonth->map(fn ($s) => $s->data_date->format('m/Y'))->toArray(),
-                                'data'   => $byMonth->map(fn ($s) => $s->transfer_count + $s->new_line_count)->toArray(),
-                            ];
-
-                            return compact('daily', 'weekly', 'monthly');
-                        })
-                        ->columnSpanFull(),
-                ]),
         ]);
     }
 }

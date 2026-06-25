@@ -614,7 +614,7 @@ tbody tr:hover td {
 /* ── 25. 6-card stats grid (Campaign Stats Overview Dashboard) ── */
 .sc-stats-grid-6 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 .sc-stats-grid-6 .sc-stat-card:nth-child(1) { animation-delay: 0.04s; }
@@ -623,8 +623,9 @@ tbody tr:hover td {
 .sc-stats-grid-6 .sc-stat-card:nth-child(4) { animation-delay: 0.16s; }
 .sc-stats-grid-6 .sc-stat-card:nth-child(5) { animation-delay: 0.20s; }
 .sc-stats-grid-6 .sc-stat-card:nth-child(6) { animation-delay: 0.24s; }
+.sc-stats-grid-6 .sc-stat-card:nth-child(7) { animation-delay: 0.28s; }
 @media (max-width: 1100px) { .sc-stats-grid-6 { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px)  { .sc-stats-grid-6 { grid-template-columns: 1fr; gap: 8px; } }
+@media (max-width: 640px)  { .sc-stats-grid-6 { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
 
 /* ── 26. Club Status Widget — dark/light-mode safe ── */
 .sc-clubs-section-header {
