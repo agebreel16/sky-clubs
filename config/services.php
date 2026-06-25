@@ -44,4 +44,8 @@ return [
         'sender_id' => env('UNIFONIC_SENDER_ID'),
     ],
 
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+    ],
+
 ];

@@ -119,6 +119,48 @@
     </a>
 </div>
 
+{{-- AI Chat Floating Button + Popup --}}
+<div x-data="{ chatOpen: false }">
+
+    {{-- Popup Panel --}}
+    <div x-show="chatOpen"
+         x-transition
+         style="position:fixed;bottom:76px;right:16px;width:360px;max-width:calc(100vw - 32px);
+                height:520px;background:var(--bg,#f8fafc);border:1px solid var(--border);
+                border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.18);
+                z-index:9998;overflow:hidden;display:flex;flex-direction:column;">
+        <livewire:agent-portal.agent-assistant :agent="$agent" />
+    </div>
+
+    {{-- FAB Pill (مغلق) --}}
+    <div x-show="!chatOpen" class="ai-fab-wrap">
+        <button x-on:click="chatOpen = true" class="ai-fab-pill">
+            <span class="ai-fab-pulse"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+                <rect x="3" y="7" width="18" height="12" rx="3"/>
+                <circle cx="9" cy="12" r="1.5" fill="white" stroke="none"/>
+                <circle cx="15" cy="12" r="1.5" fill="white" stroke="none"/>
+                <path d="M9 15.5h2M13 15.5h2"/>
+                <line x1="12" y1="7" x2="12" y2="4"/>
+                <circle cx="12" cy="3.5" r="1" fill="white" stroke="none"/>
+                <line x1="3" y1="11" x2="1.5" y2="11"/>
+                <line x1="22.5" y1="11" x2="21" y2="11"/>
+            </svg>
+            <span class="ai-fab-label">المساعد الذكي</span>
+        </button>
+    </div>
+
+    {{-- زر الإغلاق (مفتوح) --}}
+    <button x-show="chatOpen" x-on:click="chatOpen = false" class="ai-fab-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+    </button>
+
+</div>
+
 @livewireScripts
 <script>
 // Count-up animation (Alpine.js compatible)
@@ -210,6 +252,76 @@ if ('serviceWorker' in navigator && document.body.dataset.agentUuid) {
 
 /* Notification bell wrapper */
 .nav-bell-wrap { position:relative; display:flex; align-items:center; }
+
+/* ── AI FAB ─────────────────────────────────────────────────────── */
+.ai-fab-wrap {
+    position: fixed;
+    bottom: 20px;
+    right: 16px;
+    z-index: 9999;
+    animation: fab-float 3.5s ease-in-out infinite;
+}
+.ai-fab-pill {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px 0 14px;
+    height: 52px;
+    border-radius: 30px;
+    background: var(--primary);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0,0,0,.22);
+    transition: transform .15s, box-shadow .15s;
+}
+.ai-fab-pill:hover {
+    transform: scale(1.04);
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+}
+.ai-fab-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.ai-fab-pulse {
+    position: absolute;
+    inset: -5px;
+    border-radius: 34px;
+    border: 2px solid var(--primary);
+    opacity: 0;
+    pointer-events: none;
+    animation: fab-pulse 2.5s ease-out infinite;
+}
+.ai-fab-close {
+    position: fixed;
+    bottom: 20px;
+    right: 16px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,.25);
+    display: grid;
+    place-items: center;
+    z-index: 9999;
+    transition: transform .15s;
+}
+.ai-fab-close:hover { transform: scale(1.08); }
+
+@keyframes fab-float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-6px); }
+}
+@keyframes fab-pulse {
+    0%   { transform: scale(1);    opacity: .55; }
+    70%  { transform: scale(1.22); opacity: 0; }
+    100% { transform: scale(1.22); opacity: 0; }
+}
 </style>
 
 </body>
