@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'البيئة المستهدفة'
+        required: true
+        default: 'production'
+        type: choice
+        options: [production]
+
+jobs:
+  deploy-staging:
+    name: Deploy → Staging
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH Deploy to Staging
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/skyclubs.online
+            git fetch origin
+            git reset --hard origin/main
+            composer install --no-dev --optimize-autoloader --no-interaction
+            npm ci && npm run build
+            php artisan migrate --force
+            php artisan optimize
+            chown -R www-data:www-data storage bootstrap/cache
+            systemctl restart sky-staging-queue
+            echo "Staging deployed: $(git log -1 --pretty='%h %s')"
+
+  deploy-production:
+    name: Deploy → Production
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH Deploy to Production
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/skyclubs.pro
+            git fetch origin
+            git reset --hard origin/main
+            composer install --no-dev --optimize-autoloader --no-interaction
+            npm ci && npm run build
+            php artisan migrate --force
+            php artisan optimize
+            chown -R www-data:www-data storage bootstrap/cache
+            systemctl restart sky-prod-queue
+            echo "Production deployed: $(git log -1 --pretty='%h %s')"
