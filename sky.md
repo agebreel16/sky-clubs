@@ -1,5 +1,5 @@
 # Sky Clubs Campaign — Technical Blueprint
-> **الإصدار:** 3.1 | **التاريخ:** 2026-06-25 | **الكاتب:** Lead Software Architect (AI)
+> **الإصدار:** 3.2 | **التاريخ:** 2026-06-26 | **الكاتب:** Lead Software Architect (AI)
 > **Stack:** Laravel 13 · Filament 5.6 · PHP 8.4 · MySQL 8.0 · Livewire 3
 
 ---
@@ -557,6 +557,11 @@ match($action) {
 | `widgets/import-status-widget.blade.php` | آخر عمليات الاستيراد + حالتها |
 | `widgets/agents-stats-widget.blade.php` | View لـ AgentsStatsWidget (header widget في ListAgents) |
 | `widgets/campaign-stats-overview.blade.php` | View مخصص لـ CampaignStatsOverview |
+
+**Welcome Page:**
+| الملف | الوظيفة |
+|---|---|
+| `resources/views/welcome.blade.php` | **صفحة Home** — مُعاد كتابتها بالكامل (2026-06-26). تصميم "Sky Portal": خلفية داكنة `#080c14`، شعار `/images/sky-logo.png` مركزي بـ float + glow animations، حلقتان مداريتان تدوران، 28 جسيم عائم بألوان الشعار (CSS + JS)، 3 حلقات expand-ring. رابط `{{ url('/admin') }}` خفي في الزاوية فقط — لا نصوص. |
 
 **Partials (Layout & Theming):**
 | الملف | الوظيفة |
@@ -1163,6 +1168,7 @@ Alpine.js tick() كل ثانية:
 | `AgentOpportunities` | `AgentPortal/AgentOpportunities.php` | فرص مجمّعة بـ club |
 | `AgentHistory` | `AgentPortal/AgentHistory.php` | سجل مرتّب بـ `event_timestamp DESC` |
 | `NotificationBell` | `AgentPortal/NotificationBell.php` | **Bell في الـ navbar** — `wire:poll.5s` يكشف إشعارات جديدة + toast (max 3) + صوت. يستقبل حدث `notifications-marked-all-read` ويُصفِّر `unreadCount` فوراً. أنواع الإشعارات (6): `promotion` 🏆 / `demotion` 📉 / `warning` ⚠️ / `achievement` 🌟 / `milestone` / `progress` 🔔 |
+| `AgentAssistant` | `AgentPortal/AgentAssistant.php` | **مساعد ذكي** — مُضمَّن في الـ layout كـ floating popup (FAB). **لا** يرث من `AgentPortalPage` — يرث من `Livewire\Component` مباشرة. يستقبل `Agent $agent` بـ `#[Locked]` prop. يتصل بـ Groq API (model: `llama-3.3-70b-versatile`) عبر `Http::post()`. السجل مخزَّن في session: `ai_chat_{agent_id}`. `buildSystemPrompt()` يُدرج: أرقام الوكيل، ترتيبه في النادي (بدون عدد كلي)، مكافآته (مدفوع/معلَّق)، فرص السحب النشطة مُفصَّلة بالنوع، قواعد جوائز النادي الحالي والتالي. الأسلوب: عامية فلسطينية، دافئ غير رسمي، 3-4 جمل. Badge "تجريبي" في الـ header. |
 
 > **ملاحظة معمارية:** `#[Layout]` لا يُمرّر خصائص الـ component للـ layout في Livewire 3.
 > الحل: `renderWithLayout()` في `AgentPortalPage` يستخدم `->layout('layouts.agent-portal', ['agent' => $this->agent])` صراحةً.
@@ -1338,9 +1344,9 @@ ProcessAgentSelfSync::handle()
 | SMS Channel | `app/Channels/SmsChannel.php` |
 | SMS Drivers | `app/Sms/NullSmsDriver.php` · `app/Sms/UnifonicSmsDriver.php` |
 | Job | `app/Jobs/ProcessAgentSelfSync.php` |
-| Livewire (8) | `app/Livewire/AgentPortal/{AgentPortalPage,AgentSyncing,AgentDashboard,AgentProgress,AgentNotifications,AgentRewards,AgentOpportunities,AgentHistory,NotificationBell}.php` |
-| Layout | `resources/views/layouts/agent-portal.blade.php` |
-| Views (8) | `resources/views/livewire/agent-portal/{syncing,dashboard,progress,notifications,rewards,opportunities,history,notification-bell}.blade.php` |
+| Livewire (9) | `app/Livewire/AgentPortal/{AgentPortalPage,AgentSyncing,AgentDashboard,AgentProgress,AgentNotifications,AgentRewards,AgentOpportunities,AgentHistory,NotificationBell,AgentAssistant}.php` |
+| Layout | `resources/views/layouts/agent-portal.blade.php` — يحتوي FAB popup للمساعد الذكي (Alpine.js `x-data="{ chatOpen: false }"`) + CSS animations (fab-float, fab-pulse) |
+| Views (9) | `resources/views/livewire/agent-portal/{syncing,dashboard,progress,notifications,rewards,opportunities,history,notification-bell,assistant}.blade.php` |
 | Admin Modal | `resources/views/filament/agent/portal-link-modal.blade.php` |
 | Service Worker | `public/sw.js` |
 
@@ -1354,4 +1360,5 @@ ProcessAgentSelfSync::handle()
 *آخر تحديث: 2026-06-19 (معالجة Bottlenecks §7.1) — إصلاح TD-002: AgentPolicy → Authenticatable + instanceof guard. إصلاح TD-003: HistoryLog + AuditLog → performUpdate/performDeleteOnModel يرميان LogicException. تحسين Queue Jobs: tries=1 + failed() safety net في ProcessDataImport + ProcessAgentImport. تخفيف Transaction Locking: SET SESSION innodb_lock_wait_timeout=5 قبل DB::transaction. إصلاح N+1 ClubBreakdownWidget: من 13 query → 6 queries. إضافة BulkAction "قبول الترقيات المحددة" في ClubChangeRequestResource. إغلاق Bonus Idempotency (كانت مُعالَجة فعلاً في الكود).*
 *آخر تحديث: 2026-06-20 (الإصدار 3.0 — نظام Agent Self-Sync) — إضافة §12.10 شرح كامل لنظام المزامنة الذاتية. إضافة `ProcessAgentSelfSync` job (synchronous، لا queue) في §5.2. إضافة `AgentSyncing` Livewire component في §12.4. إضافة مسار `/syncing` في §12.3 (10 مسارات). تحديث Auth Flow في §12.2 (enter → /syncing → wire:init → dashboard). تحديث Agent Model §12.7 وجدول agents §2.1 بحقل `last_self_sync_at`. تحديث AppSetting §5.8 لإضافة `ProcessAgentSelfSync` في deals_api_*. إضافة مخاطرة Self-Sync API Latency في §7.1. إصلاحان حرجان: (1) `DailySnapshot.import_id NOT NULL` → استخدام `update()` لا `updateOrCreate()` — كان يمنع إنشاء ClubChangeRequest كلياً. (2) Queue dependency → wire:init synchronous pattern بلا queue worker.*
 *آخر تحديث: 2026-06-25 (الإصدار 3.1 — تحسينات بوابة الوكيل + إصلاحات لوحة الموزع) — بوابة الوكيل: دمج "الخطوط الجديدة" كسطر تفصيلي داخل "إجمالي الزيادة". بطاقة تحفيزية ديناميكية للوكلاء خارج الأندية (6 مراحل). شريط الحالة الحي بـ 6 حالات ديناميكية بدلاً من "وضعك جيد" الثابتة. إصلاح حساب ترتيب النادي (`transfer_count` بدل `current_total`، بدون إظهار العدد الكلي). إصلاح مقياس شريط التقدم (unified scale). حذف "المخطط الزمني للأداء" من ViewAgent + حذف `daily-progress-chart.blade.php`. لوحة الموزع: إصلاح N+1 في `agents_count` (`->counts('agents')`). إصلاح badge الفارغ في RelationManager. إضافة حقل الموزع في ViewAgent مع رابط. جعل `distributor_id` اختيارياً في نموذج Agent. تحديث §3.2، §5.5، §5.7، §7.1، §8، §12.4.*
+*آخر تحديث: 2026-06-26 (الإصدار 3.2 — مساعد ذكي + إعادة تصميم Home) — إضافة `AgentAssistant` Livewire component: مساعد AI باللهجة الفلسطينية مُضمَّن كـ floating popup (FAB) في بوابة الوكيل، يتصل بـ Groq API (llama-3.3-70b-versatile)، system prompt يشمل أرقام الوكيل + مكافآت + فرص سحب + جوائز الأندية. إصلاح `wire:loading.flex` (كانت dots دائماً ظاهرة بسبب conflict مع inline `display:flex`). إعادة كتابة `welcome.blade.php` بتصميم "Sky Portal" داكن متحرك. تحديث §12.4، §12.9، §5.7.*
 *يجب تحديثه عند أي تغيير جوهري في: ProcessDataImport، AgentObserver، بنية الـ Clubs، نظام المصادقة، Agent Portal، Console Commands المجدولة، أو SyncStatusBadge.*
