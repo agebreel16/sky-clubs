@@ -42,7 +42,10 @@
         <livewire:agent-portal.notification-bell :uuid="$agent->agent_id" />
         <form method="POST" action="{{ route('agent.portal.logout', ['uuid' => $agent->agent_id]) }}" style="display:inline;">
             @csrf
-            <button type="submit" class="nav-logout">خروج</button>
+            <button type="submit" class="nav-logout">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span class="nav-logout-label">خروج</span>
+            </button>
         </form>
     </div>
 </header>
@@ -321,6 +324,12 @@ if ('serviceWorker' in navigator && document.body.dataset.agentUuid) {
     0%   { transform: scale(1);    opacity: .55; }
     70%  { transform: scale(1.22); opacity: 0; }
     100% { transform: scale(1.22); opacity: 0; }
+}
+
+/* FAB: positioned above bottom-nav on mobile */
+@media (max-width: 767px) {
+    .ai-fab-wrap  { bottom: 74px !important; }
+    .ai-fab-close { bottom: 74px !important; }
 }
 </style>
 

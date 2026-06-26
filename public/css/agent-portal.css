@@ -764,3 +764,21 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 768px) { .block-grid.cols-2, .block-grid.cols-3 { grid-template-columns: 1fr; } }
 
 .empty { padding: 40px; text-align: center; color: var(--slate-500); font-size: 13px; }
+
+/* ===== Mobile Responsive Fixes ===== */
+@media (max-width: 767px) {
+    /* Navbar: slim down — too many items on narrow screens */
+    .navbar-inner { padding: 10px 16px; gap: 8px; }
+    .nav-club-pill { display: none; }
+    .nav-user-name { display: none; }
+    .nav-user { padding: 3px 6px 3px 3px; gap: 6px; }
+    .nav-avatar { width: 28px; height: 28px; font-size: 12px; }
+    /* Logout: icon-only on mobile */
+    .nav-logout-label { display: none; }
+    .nav-logout { padding: 6px 8px; display: inline-flex; align-items: center; justify-content: center; }
+
+    /* Bottom-nav: equal-width flexible tabs, smaller icons/text */
+    .bottom-tab { flex: 1; min-width: 0; padding: 4px 1px; font-size: 9px; gap: 2px; }
+    .bottom-tab .icon-w { width: 20px; height: 20px; }
+    .bottom-tab .icon-w svg { width: 18px !important; height: 18px !important; }
+}
