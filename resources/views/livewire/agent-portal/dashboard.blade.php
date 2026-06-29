@@ -138,13 +138,13 @@
                 $safeDot = '#10b981'; $safeBg = '#f0fdf4'; $safeBorder = '#6ee7b7';
             } elseif (!$scTransferMet) {
                 $remainT   = ($nextClub->required_transfer_count ?? 0) - $agent->transfer_count;
-                $safeLabel = 'ركّز على التحويل — متبقٍ ' . $remainT . ' خط للترقية';
+                $safeLabel = 'ركّز على التحويل — متبقي ' . $remainT . ' خط للترقية';
                 $safeDot = '#d97706'; $safeBg = '#fffbeb'; $safeBorder = '#fde68a';
             } elseif (!$scRatioMet) {
                 $safeLabel = 'نسبة التحويل دون المطلوب — ' . $scAgentRatio . '% / ' . ($scRatioPct * 100) . '%';
                 $safeDot = '#d97706'; $safeBg = '#fffbeb'; $safeBorder = '#fde68a';
             } elseif ($scNeeded <= (int)ceil($nextClub->required_increase * 0.2)) {
-                $safeLabel = 'اقتربت! متبقٍ ' . $scNeeded . ' زيادة لنادي ' . $nextClub->club_name;
+                $safeLabel = 'اقتربت! متبقي ' . $scNeeded . ' زيادة لنادي ' . $nextClub->club_name;
                 $safeDot = '#0ea5e9'; $safeBg = '#eff6ff'; $safeBorder = '#bae6fd';
             } else {
                 $safeLabel = 'وضعك جيد — تحتاج ' . $scNeeded . ' زيادة لنادي ' . $nextClub->club_name;
@@ -346,7 +346,7 @@
                                 @if($totalMet)
                                     <span style="font-size:11px;font-weight:700;color:#16a34a;background:#dcfce7;padding:3px 10px;border-radius:999px;">✓ محقق</span>
                                 @else
-                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">متبقٍ {{ $nextClub->required_increase - $agentIncrease }}</span>
+                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">متبقي {{ $nextClub->required_increase - $agentIncrease }}</span>
                                 @endif
                             </div>
 
@@ -360,7 +360,7 @@
                                 @if($transferMet)
                                     <span style="font-size:11px;font-weight:700;color:#16a34a;background:#dcfce7;padding:3px 10px;border-radius:999px;">✓ محقق</span>
                                 @else
-                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">متبقٍ {{ $nextClub->required_transfer_count - $agent->transfer_count }}</span>
+                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">متبقي {{ $nextClub->required_transfer_count - $agent->transfer_count }}</span>
                                 @endif
                             </div>
                             @endif
