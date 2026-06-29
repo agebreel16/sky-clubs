@@ -392,9 +392,21 @@
             {{-- إحصاءات الأداء --}}
             @if($agent->club)
                 <div class="card card-pad">
-                    <div class="section-head" style="margin:0 0 16px;">
+                    <div class="section-head" style="margin:0 0 12px;">
                         <h2>إحصاءات الأداء</h2>
                         <span class="meta">منذ بداية الحملة</span>
+                    </div>
+                    @php
+                        $clubColor = match($agent->club->club_order) {
+                            1       => ['bg' => '#dbeafe', 'text' => '#1d4ed8', 'border' => '#93c5fd'],
+                            2       => ['bg' => '#ede9fe', 'text' => '#5b21b6', 'border' => '#c4b5fd'],
+                            3       => ['bg' => '#fef3c7', 'text' => '#92400e', 'border' => '#fcd34d'],
+                            default => ['bg' => '#f1f5f9', 'text' => '#475569', 'border' => '#cbd5e1'],
+                        };
+                    @endphp
+                    <div style="margin-bottom:14px;padding:10px 14px;background:{{ $clubColor['bg'] }};border:1px solid {{ $clubColor['border'] }};border-radius:10px;display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:14px;font-weight:700;color:{{ $clubColor['text'] }};">★ {{ $agent->club->club_name }}</span>
+                        <span style="font-size:11px;color:{{ $clubColor['text'] }};opacity:0.8;">— أرقامك بالنسبة لأصل {{ $agent->club->required_increase }} خط</span>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div style="padding:14px;background:#eff6ff;border-radius:12px;text-align:center;">
