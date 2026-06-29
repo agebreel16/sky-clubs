@@ -329,8 +329,8 @@
                             $transferMet   = $agent->transfer_count >= $nextClub->required_transfer_count;
                             $totalMet      = $agentIncrease         >= $nextClub->required_increase;
                             $ratioPct      = $nextClub->required_transfer_percentage ?? 0;
-                            $agentRatioPct = $agent->campaign_increase > 0
-                                ? round($agent->transfer_count / $agent->campaign_increase * 100, 1)
+                            $agentRatioPct = ($nextClub && $nextClub->required_increase > 0)
+                                ? round($agent->transfer_count / $nextClub->required_increase * 100, 1)
                                 : 0;
                             $ratioMet      = $ratioPct <= 0 || $agentRatioPct >= ($ratioPct * 100);
                         @endphp
@@ -409,9 +409,27 @@
                             <div style="font-size:26px;font-weight:800;color:#7c3aed;">{{ number_format($agent->campaign_increase) }}</div>
                             <div style="font-size:11px;color:#8b5cf6;font-weight:600;margin-top:4px;">إجمالي الزيادة</div>
                         </div>
+                        @php
+                            $ratioGaugePct = $agent->transfer_percentage > 0
+                                ? min((int)round($agent->transfer_percentage / 60 * 100), 100)
+                                : 0;
+                            $ratioAchieved = $agent->transfer_percentage >= 60;
+                        @endphp
                         <div style="padding:14px;background:#fff7ed;border-radius:12px;text-align:center;">
-                            <div style="font-size:26px;font-weight:800;color:#ea580c;">{{ number_format($agent->transfer_percentage, 1) }}%</div>
+                            <div style="font-size:26px;font-weight:800;color:{{ $ratioAchieved ? '#16a34a' : '#ea580c' }};">
+                                {{ number_format($agent->transfer_percentage, 1) }}%
+                            </div>
                             <div style="font-size:11px;color:#f97316;font-weight:600;margin-top:4px;">نسبة التحويل</div>
+                            <div style="margin-top:8px;background:#fed7aa;border-radius:999px;height:5px;overflow:hidden;">
+                                <div style="width:{{ $ratioGaugePct }}%;height:100%;background:{{ $ratioAchieved ? '#16a34a' : '#f97316' }};border-radius:999px;transition:width 0.8s ease;"></div>
+                            </div>
+                            <div style="font-size:10px;color:{{ $ratioAchieved ? '#16a34a' : '#94a3b8' }};margin-top:3px;">
+                                @if($ratioAchieved)
+                                    ✓ تجاوزت حد 60%
+                                @else
+                                    {{ $ratioGaugePct }}% من هدف 60%
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </div>
