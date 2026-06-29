@@ -393,8 +393,8 @@
             @if($agent->club)
                 <div class="card card-pad">
                     <div class="section-head" style="margin:0 0 12px;">
-                        <h2>إحصاءات الأداء</h2>
-                        <span class="meta">منذ بداية الحملة</span>
+                        <h2>إحصاءات الأداء للنادي الحالي</h2>
+         
                     </div>
                     @php
                         $clubColor = match($agent->club->club_order) {
@@ -406,7 +406,7 @@
                     @endphp
                     <div style="margin-bottom:14px;padding:10px 14px;background:{{ $clubColor['bg'] }};border:1px solid {{ $clubColor['border'] }};border-radius:10px;display:flex;align-items:center;gap:8px;">
                         <span style="font-size:14px;font-weight:700;color:{{ $clubColor['text'] }};">★ {{ $agent->club->club_name }}</span>
-                        <span style="font-size:11px;color:{{ $clubColor['text'] }};opacity:0.8;">— أرقامك بالنسبة لأصل {{ $agent->club->required_increase }} خط</span>
+                        <span style="font-size:11px;color:{{ $clubColor['text'] }};opacity:0.8;">— الإحصاءات بالنسبة للنادي الحالي  {{ $agent->club->required_increase }} خط</span>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div style="padding:14px;background:#eff6ff;border-radius:12px;text-align:center;">
