@@ -84,11 +84,8 @@
                     </div>
 
                     <div style="background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:14px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
-                        <div style="font-size:22px;font-weight:800;color:{{ $heroRatioAchieved ? '#86efac' : '#fda4af' }};line-height:1.1;white-space:nowrap;">{{ number_format($agent->transfer_percentage, 1) }}<span style="font-size:14px;font-weight:700;">%</span></div>
+                        <div style="font-size:22px;font-weight:800;color:{{ $heroRatioAchieved ? '#86efac' : '#fda4af' }};line-height:1.1;">{{ round($agent->transfer_percentage) }}<span style="font-size:14px;font-weight:700;">%</span></div>
                         <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:4px;font-weight:600;">نسبة التحويل</div>
-                        <div style="margin-top:6px;background:rgba(255,255,255,0.2);border-radius:999px;height:4px;overflow:hidden;">
-                            <div style="width:{{ $heroRatioGaugePct }}%;height:100%;background:{{ $heroRatioAchieved ? '#86efac' : '#fb923c' }};border-radius:999px;"></div>
-                        </div>
                     </div>
 
                 </div>
