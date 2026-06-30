@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ClubChangeRequestResource\Pages;
 use App\Models\Agent;
 use App\Models\AgentNotification;
+use App\Models\Club;
 use App\Models\ClubChangeRequest;
 use App\Models\HistoryLog;
 use App\Models\Opportunity;
@@ -261,15 +262,24 @@ class ClubChangeRequestResource extends Resource
                 'payment_status'   => 'pending',
             ]);
 
-            $entryCount = $toClub->entry_opportunities ?? 1;
-            for ($i = 0; $i < $entryCount; $i++) {
-                Opportunity::create([
-                    'agent_id'    => $agent->agent_id,
-                    'club_id'     => $toClub->club_id,
-                    'type'        => 'entry',
-                    'earned_date' => now(),
-                    'is_active'   => true,
-                ]);
+            $existingEntryClubIds = $agent->opportunities()
+                ->where('type', 'entry')
+                ->where('is_active', true)
+                ->pluck('club_id')
+                ->all();
+            $clubsUpTo = Club::where('club_order', '<=', $toClub->club_order)
+                ->orderBy('club_order')
+                ->get();
+            foreach ($clubsUpTo as $club) {
+                if (!in_array($club->club_id, $existingEntryClubIds)) {
+                    Opportunity::create([
+                        'agent_id'    => $agent->agent_id,
+                        'club_id'     => $club->club_id,
+                        'type'        => 'entry',
+                        'earned_date' => now(),
+                        'is_active'   => true,
+                    ]);
+                }
             }
 
             if ($isFirst) {
@@ -304,7 +314,7 @@ class ClubChangeRequestResource extends Resource
                 ));
             }
         } else {
-            // تهبيط — تحديث النادي فقط، لا إشعار
+            // تهبيط
             $updateData['current_club_id'] = $record->to_club_id; // null إذا خارج الأندية
             Agent::where('agent_id', $agent->agent_id)->update($updateData);
 
@@ -316,6 +326,26 @@ class ClubChangeRequestResource extends Resource
                 'reason'          => 'قبول طلب التهبيط من قِبَل الإدارة',
                 'event_timestamp' => now(),
             ]);
+
+            $fromClub      = $record->from_club_id ? Club::find($record->from_club_id) : null;
+            $demotionTitle = 'تغيير في عضوية نادي';
+            $demotionBody  = $toClub
+                ? "تم نقلك من {$fromClub->club_name} إلى {$toClub->club_name}."
+                : "تم خروجك من {$fromClub->club_name}.";
+
+            AgentNotification::create([
+                'agent_id'          => $agent->agent_id,
+                'club_id'           => $record->from_club_id,
+                'notification_type' => 'demotion',
+                'title'             => $demotionTitle,
+                'body'              => $demotionBody,
+                'category'          => 'in_club',
+                'sent_at'           => now(),
+            ]);
+
+            if ($agent->portal_token) {
+                $agent->notify(new AgentPortalNotification(title: $demotionTitle, body: $demotionBody));
+            }
         }
 
         $record->update([
@@ -355,7 +385,28 @@ class ClubChangeRequestResource extends Resource
             'reason'          => $data['rejection_reason'],
             'event_timestamp' => now(),
         ]);
-        // لا إشعار للوكيل عند الرفض
+
+        $toClub         = $record->toClub;
+        $rejectionTitle = $record->change_type === 'promotion'
+            ? 'طلب الترقية لم يُقبَل'
+            : 'طلب المراجعة لم يُقبَل';
+        $rejectionBody  = $record->change_type === 'promotion' && $toClub
+            ? "لم يتم قبول طلب انضمامك إلى {$toClub->club_name}."
+            : "لم يتم قبول طلب مراجعة عضويتك.";
+
+        AgentNotification::create([
+            'agent_id'          => $agent->agent_id,
+            'club_id'           => $record->to_club_id,
+            'notification_type' => 'warning',
+            'title'             => $rejectionTitle,
+            'body'              => $rejectionBody,
+            'category'          => 'in_club',
+            'sent_at'           => now(),
+        ]);
+
+        if ($agent->portal_token) {
+            $agent->notify(new AgentPortalNotification(title: $rejectionTitle, body: $rejectionBody));
+        }
 
         if (! empty($data['mark_as_violator'])) {
             Agent::where('agent_id', $agent->agent_id)->update([

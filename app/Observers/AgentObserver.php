@@ -73,15 +73,24 @@ class AgentObserver
                 'payment_status'   => 'pending',
             ]);
 
-            $entryCount = $toClub->entry_opportunities ?? 1;
-            for ($i = 0; $i < $entryCount; $i++) {
-                Opportunity::create([
-                    'agent_id'    => $agent->agent_id,
-                    'club_id'     => $toClubId,
-                    'type'        => 'entry',
-                    'earned_date' => now(),
-                    'is_active'   => true,
-                ]);
+            $existingEntryClubIds = $agent->opportunities()
+                ->where('type', 'entry')
+                ->where('is_active', true)
+                ->pluck('club_id')
+                ->all();
+            $clubsUpTo = Club::where('club_order', '<=', $toClub->club_order)
+                ->orderBy('club_order')
+                ->get();
+            foreach ($clubsUpTo as $club) {
+                if (!in_array($club->club_id, $existingEntryClubIds)) {
+                    Opportunity::create([
+                        'agent_id'    => $agent->agent_id,
+                        'club_id'     => $club->club_id,
+                        'type'        => 'entry',
+                        'earned_date' => now(),
+                        'is_active'   => true,
+                    ]);
+                }
             }
 
             if ($agent->is_first_arrival) {
@@ -111,8 +120,26 @@ class AgentObserver
             if ($agent->portal_token) {
                 $agent->notify(new AgentPortalNotification(title: $notifTitle, body: $notifBody));
             }
+        } else {
+            $demotionTitle = 'تغيير في عضوية نادي';
+            $demotionBody  = $toClub
+                ? "تم نقلك من {$fromClub->club_name} إلى {$toClub->club_name}."
+                : "تم خروجك من {$fromClub->club_name}.";
+
+            AgentNotification::create([
+                'agent_id'          => $agent->agent_id,
+                'club_id'           => $fromClubId,
+                'notification_type' => 'demotion',
+                'title'             => $demotionTitle,
+                'body'              => $demotionBody,
+                'category'          => 'in_club',
+                'sent_at'           => now(),
+            ]);
+
+            if ($agent->portal_token) {
+                $agent->notify(new AgentPortalNotification(title: $demotionTitle, body: $demotionBody));
+            }
         }
-        // التهبيط اليدوي: HistoryLog فقط — لا إشعار للوكيل
     }
 
     private function handleViolatorRemoval(Agent $agent): void
@@ -201,12 +228,31 @@ class AgentObserver
             'payment_status'   => 'pending',
         ]);
 
-        $entryCount = $bestClub->entry_opportunities ?? 1;
-        for ($i = 0; $i < $entryCount; $i++) {
+        $existingEntryClubIds = $agent->opportunities()
+            ->where('type', 'entry')
+            ->where('is_active', true)
+            ->pluck('club_id')
+            ->all();
+        $clubsUpTo = Club::where('club_order', '<=', $bestClub->club_order)
+            ->orderBy('club_order')
+            ->get();
+        foreach ($clubsUpTo as $club) {
+            if (!in_array($club->club_id, $existingEntryClubIds)) {
+                Opportunity::create([
+                    'agent_id'    => $agent->agent_id,
+                    'club_id'     => $club->club_id,
+                    'type'        => 'entry',
+                    'earned_date' => now(),
+                    'is_active'   => true,
+                ]);
+            }
+        }
+
+        if ($isFirst) {
             Opportunity::create([
                 'agent_id'    => $agent->agent_id,
                 'club_id'     => $bestClub->club_id,
-                'type'        => 'entry',
+                'type'        => 'first_arrival',
                 'earned_date' => now(),
                 'is_active'   => true,
             ]);
