@@ -320,7 +320,12 @@
                         </div>
                     </div>
                     <div class="progress-need">
-                        تحتاج <strong style="color:var(--primary);font-weight:700;">+{{ $needed }} زيادة</strong> إضافية للوصول إلى {{ $nextClub?->club_name ?? 'أول نادٍ' }}
+                        @if($needed === 0)
+                            <span style="color:#16a34a;font-weight:700;">✓ حققت إجمالي الزيادة</span>
+                            — ركّز الآن على خطوط التحويل للترقية
+                        @else
+                            تحتاج <strong style="color:var(--primary);font-weight:700;">+{{ $needed }} زيادة</strong> إضافية للوصول إلى {{ $nextClub?->club_name ?? 'أول نادٍ' }}
+                        @endif
                     </div>
 
                     {{-- تفصيل شروط الترقية --}}

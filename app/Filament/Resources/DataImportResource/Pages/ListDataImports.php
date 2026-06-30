@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\DataImportResource\Pages;
 
 use App\Filament\Resources\DataImportResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListDataImports extends ListRecords
@@ -12,8 +11,6 @@ class ListDataImports extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            CreateAction::make()->label('New Import'),
-        ];
+        return [];
     }
 }

@@ -6,7 +6,6 @@ use App\Models\Agent;
 use App\Models\Club;
 use App\Models\ClubChangeRequest;
 use Filament\Widgets\Widget;
-use Illuminate\Support\Facades\DB;
 
 class CampaignFunnelWidget extends Widget
 {
@@ -23,8 +22,7 @@ class CampaignFunnelWidget extends Widget
         $clubs = Club::orderBy('club_order')->get()->keyBy('club_order');
         $club1 = $clubs->get(1);
 
-        $threshold    = $club1?->required_increase ?? 25;
-        $nearThreshold = (int) round($threshold * 0.8);
+        $threshold = $club1?->required_increase ?? 25;
 
         // Agents with pending promotion requests (any club level)
         $pendingAgentIds = ClubChangeRequest::where('status', 'pending')
@@ -40,16 +38,15 @@ class CampaignFunnelWidget extends Widget
             ->whereNotIn('agent_id', $pendingAgentIds);
 
         $notStarted = (clone $outsideQuery)
-            ->where(DB::raw('transfer_count + new_line_count'), '=', 0)
+            ->where('transfer_count', '=', 0)
             ->count();
 
         $inProgress = (clone $outsideQuery)
-            ->where(DB::raw('transfer_count + new_line_count'), '>', 0)
-            ->where(DB::raw('transfer_count + new_line_count'), '<', $nearThreshold)
+            ->whereBetween('transfer_count', [1, 9])
             ->count();
 
         $nearDoor = (clone $outsideQuery)
-            ->where(DB::raw('transfer_count + new_line_count'), '>=', $nearThreshold)
+            ->where('transfer_count', '>=', 10)
             ->count();
 
         // Agents inside clubs (non-violators)
@@ -71,7 +68,7 @@ class CampaignFunnelWidget extends Widget
                 'color'   => 'var(--sc-text3)',
                 'bg'      => 'var(--sc-surface2)',
                 'icon'    => 'minus',
-                'url'     => null,
+                'url'     => '/admin/agent-filter/not_started',
             ],
             [
                 'label'   => 'في الطريق',
@@ -79,7 +76,7 @@ class CampaignFunnelWidget extends Widget
                 'color'   => 'var(--sc-accent)',
                 'bg'      => 'oklch(0.60 0.22 245 / 0.12)',
                 'icon'    => 'trending-up',
-                'url'     => null,
+                'url'     => '/admin/agent-filter/in_progress',
             ],
             [
                 'label'   => 'على الأعتاب',
@@ -87,7 +84,7 @@ class CampaignFunnelWidget extends Widget
                 'color'   => 'var(--sc-gold)',
                 'bg'      => 'oklch(0.78 0.15 82 / 0.12)',
                 'icon'    => 'flag',
-                'url'     => null,
+                'url'     => '/admin/agent-filter/near_door',
             ],
             [
                 'label'   => 'منتظر قبول',

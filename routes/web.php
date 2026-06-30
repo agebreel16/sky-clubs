@@ -34,6 +34,17 @@ Route::prefix('agent/{uuid}')
         Route::post('/logout', [AgentPortalController::class, 'logout'])->name('logout');
     });
 
+// Admin: set funnel stage filter via session then redirect
+Route::get('/admin/agent-filter/{stage}', function (string $stage) {
+    $allowed = ['not_started', 'in_progress', 'near_door'];
+    if (! in_array($stage, $allowed)) {
+        return redirect('/admin/agents');
+    }
+    $key = 'tables.' . md5(\App\Filament\Resources\AgentResource\Pages\ListAgents::class) . '_filters';
+    session()->put($key, ['funnel_stage' => ['value' => $stage]]);
+    return redirect('/admin/agents');
+})->middleware(['web', 'auth'])->name('admin.agent-filter');
+
 // WebPush subscription endpoint
 Route::post('/agent/{uuid}/push/subscribe', [AgentPortalController::class, 'subscribePush'])
     ->middleware(['web', 'agent.portal.auth'])

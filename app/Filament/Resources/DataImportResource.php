@@ -228,7 +228,6 @@ class DataImportResource extends Resource
     {
         return [
             'index'  => Pages\ListDataImports::route('/'),
-            'create' => Pages\CreateDataImport::route('/create'),
             'view'   => Pages\ViewDataImport::route('/{record}'),
         ];
     }

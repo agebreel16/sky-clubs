@@ -4,6 +4,7 @@ namespace App\Filament\Resources\AgentResource\Pages;
 
 use App\Exports\AgentsExport;
 use App\Exports\ApproachingAgentsExport;
+use App\Exports\FunnelStageExport;
 use App\Filament\Resources\AgentResource;
 use App\Filament\Widgets\AgentsStatsWidget;
 use App\Models\Agent;
@@ -53,12 +54,27 @@ class ListAgents extends ListRecords
 
                     return app(ApproachingAgentsExport::class)->download($agents, $antelaaq);
                 }),
+            Action::make('export_funnel')
+                ->label('تصدير الفئة')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('info')
+                ->visible(fn () => filled($this->tableFilters['funnel_stage']['value'] ?? null))
+                ->action(function () {
+                    $stage = $this->tableFilters['funnel_stage']['value'] ?? null;
+                    if (!$stage) return;
+                    return (new FunnelStageExport($stage))->download();
+                }),
         ];
     }
 
     /**
      * Stats widget shown above the table (4 KPI cards from the design).
      */
+    protected function shouldPersistTableFiltersInSession(): bool
+    {
+        return true;
+    }
+
     protected function getHeaderWidgets(): array
     {
         return [

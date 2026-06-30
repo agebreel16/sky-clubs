@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\AgentResource\Pages;
 use App\Models\Agent;
 use App\Models\Club;
+use App\Models\ClubChangeRequest;
 use App\Models\Distributor;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -368,6 +370,32 @@ class AgentResource extends Resource
 
                 TernaryFilter::make('is_violator')
                     ->label('مخالف'),
+
+                SelectFilter::make('funnel_stage')
+                    ->label('مرحلة الوكيل')
+                    ->options([
+                        'not_started' => 'لم يبدأ بعد',
+                        'in_progress' => 'في الطريق',
+                        'near_door'   => 'على الأعتاب',
+                    ])
+                    ->query(function (Builder $query, array $data): void {
+                        if (blank($data['value'])) return;
+
+                        $pendingIds = ClubChangeRequest::where('status', 'pending')
+                            ->where('change_type', 'promotion')
+                            ->pluck('agent_id');
+
+                        $query->whereNull('current_club_id')
+                              ->where('is_violator', false)
+                              ->whereNotIn('agent_id', $pendingIds);
+
+                        match ($data['value']) {
+                            'not_started' => $query->where('transfer_count', '=', 0),
+                            'in_progress' => $query->whereBetween('transfer_count', [1, 9]),
+                            'near_door'   => $query->where('transfer_count', '>=', 10),
+                            default       => null,
+                        };
+                    }),
             ])
             ->actions([
                 ViewAction::make()->label('عرض'),

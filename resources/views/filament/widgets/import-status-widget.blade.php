@@ -70,11 +70,6 @@
                                 <x-heroicon-m-eye style="width: 1rem; height: 1rem;"/>
                                 التفاصيل
                             </a>
-                            <a href="{{ url('/admin/data-imports/create') }}"
-                               style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.75rem; background: #111827; color: #fff; font-size: 0.875rem; font-weight: 700; text-decoration: none; transition: all 0.2s;">
-                                <x-heroicon-m-arrow-up-tray style="width: 1rem; height: 1rem;"/>
-                                استيراد جديد
-                            </a>
                         </div>
                     </div>
 
