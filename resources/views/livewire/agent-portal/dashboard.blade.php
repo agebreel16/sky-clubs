@@ -57,6 +57,42 @@
                 @endif
                 <div class="hero-meta-item live-dot">اتصال حي</div>
             </div>
+
+            {{-- Stats Strip --}}
+            @php
+                $heroRatioGaugePct = $agent->transfer_percentage > 0
+                    ? min((int)round($agent->transfer_percentage / 60 * 100), 100)
+                    : 0;
+                $heroRatioAchieved = $agent->transfer_percentage >= 60;
+            @endphp
+            <div style="border-top:1px solid rgba(255,255,255,0.25);margin-top:16px;padding-top:14px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px;">
+
+                    <div style="background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:14px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.1;">{{ number_format($agent->new_line_count) }}</div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:4px;font-weight:600;">خطوط جديدة</div>
+                    </div>
+
+                    <div style="background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:14px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.1;">{{ number_format($agent->transfer_count) }}</div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:4px;font-weight:600;">خطوط التحويل</div>
+                    </div>
+
+                    <div style="background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:14px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.1;">{{ number_format($agent->campaign_increase) }}</div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:4px;font-weight:600;">إجمالي الزيادة</div>
+                    </div>
+
+                    <div style="background:rgba(0,0,0,0.18);border:1px solid rgba(255,255,255,0.25);border-radius:12px;padding:14px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                        <div style="font-size:22px;font-weight:800;color:{{ $heroRatioAchieved ? '#86efac' : '#fda4af' }};line-height:1.1;white-space:nowrap;">{{ number_format($agent->transfer_percentage, 1) }}<span style="font-size:14px;font-weight:700;">%</span></div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:4px;font-weight:600;">نسبة التحويل</div>
+                        <div style="margin-top:6px;background:rgba(255,255,255,0.2);border-radius:999px;height:4px;overflow:hidden;">
+                            <div style="width:{{ $heroRatioGaugePct }}%;height:100%;background:{{ $heroRatioAchieved ? '#86efac' : '#fb923c' }};border-radius:999px;"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
         </div>
     @else
         @php
@@ -393,64 +429,6 @@
 
         {{-- العمود الجانبي: متطلبات البقاء + Pressure Meter --}}
         <div style="display:flex;flex-direction:column;gap:16px;">
-
-            {{-- إحصاءات الأداء --}}
-            @if($agent->club)
-                <div class="card card-pad">
-                    <div class="section-head" style="margin:0 0 12px;">
-                        <h2>إحصاءات الأداء للنادي الحالي</h2>
-         
-                    </div>
-                    @php
-                        $clubColor = match($agent->club->club_order) {
-                            1       => ['bg' => '#dbeafe', 'text' => '#1d4ed8', 'border' => '#93c5fd'],
-                            2       => ['bg' => '#ede9fe', 'text' => '#5b21b6', 'border' => '#c4b5fd'],
-                            3       => ['bg' => '#fef3c7', 'text' => '#92400e', 'border' => '#fcd34d'],
-                            default => ['bg' => '#f1f5f9', 'text' => '#475569', 'border' => '#cbd5e1'],
-                        };
-                    @endphp
-                    <div style="margin-bottom:14px;padding:10px 14px;background:{{ $clubColor['bg'] }};border:1px solid {{ $clubColor['border'] }};border-radius:10px;display:flex;align-items:center;gap:8px;">
-                        <span style="font-size:14px;font-weight:700;color:{{ $clubColor['text'] }};">★ {{ $agent->club->club_name }}</span>
-                        <span style="font-size:11px;color:{{ $clubColor['text'] }};opacity:0.8;">— الإحصاءات بالنسبة للنادي الحالي  {{ $agent->club->required_increase }} خط</span>
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                        <div style="padding:14px;background:#eff6ff;border-radius:12px;text-align:center;">
-                            <div style="font-size:26px;font-weight:800;color:#2563eb;">{{ number_format($agent->transfer_count) }}</div>
-                            <div style="font-size:11px;color:#3b82f6;font-weight:600;margin-top:4px;">خطوط التحويل</div>
-                        </div>
-                        <div style="padding:14px;background:#f0fdf4;border-radius:12px;text-align:center;">
-                            <div style="font-size:26px;font-weight:800;color:#16a34a;">{{ number_format($agent->new_line_count) }}</div>
-                            <div style="font-size:11px;color:#22c55e;font-weight:600;margin-top:4px;">خطوط جديدة</div>
-                        </div>
-                        <div style="padding:14px;background:#faf5ff;border-radius:12px;text-align:center;">
-                            <div style="font-size:26px;font-weight:800;color:#7c3aed;">{{ number_format($agent->campaign_increase) }}</div>
-                            <div style="font-size:11px;color:#8b5cf6;font-weight:600;margin-top:4px;">إجمالي الزيادة</div>
-                        </div>
-                        @php
-                            $ratioGaugePct = $agent->transfer_percentage > 0
-                                ? min((int)round($agent->transfer_percentage / 60 * 100), 100)
-                                : 0;
-                            $ratioAchieved = $agent->transfer_percentage >= 60;
-                        @endphp
-                        <div style="padding:14px;background:#fff7ed;border-radius:12px;text-align:center;">
-                            <div style="font-size:26px;font-weight:800;color:{{ $ratioAchieved ? '#16a34a' : '#ea580c' }};">
-                                {{ number_format($agent->transfer_percentage, 1) }}%
-                            </div>
-                            <div style="font-size:11px;color:#f97316;font-weight:600;margin-top:4px;">نسبة التحويل</div>
-                            <div style="margin-top:8px;background:#fed7aa;border-radius:999px;height:5px;overflow:hidden;">
-                                <div style="width:{{ $ratioGaugePct }}%;height:100%;background:{{ $ratioAchieved ? '#16a34a' : '#f97316' }};border-radius:999px;transition:width 0.8s ease;"></div>
-                            </div>
-                            <div style="font-size:10px;color:{{ $ratioAchieved ? '#16a34a' : '#94a3b8' }};margin-top:3px;">
-                                @if($ratioAchieved)
-                                    ✓ تجاوزت حد 60%
-                                @else
-                                    {{ $ratioGaugePct }}% من هدف 60%
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            @endif
 
             {{-- فرصك المكتسبة --}}
             @php
