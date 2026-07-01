@@ -314,9 +314,11 @@ updated(Agent $agent)
   ├─ [إذا تغيّر current_club_id] → handleClubChange()
   │    ├─ يحدد eventType: promotion / demotion
   │    ├─ HistoryLog::create(...)
-  │    ├─ [promotion] Reward::create(base) + Reward::create(first_arrival إذا is_first)
-  │    ├─ [promotion] Opportunity::create(entry × N) + Opportunity::create(first_arrival)
-  │    └─ AgentNotification::create(promotion)  ← إشعار فقط للترقية
+  │    ├─ [promotion] Reward::create(base أو first_arrival_amount حسب is_first_arrival)
+  │    ├─ [promotion] entry Opportunity لكل نادٍ حتى مستوى الهدف (dedup — pluck+in_array، لا N+1)
+  │    ├─ [promotion] Opportunity::create(first_arrival) إذا is_first_arrival
+  │    ├─ [promotion] AgentNotification::create(promotion) + WebPush
+  │    └─ [demotion] AgentNotification::create(demotion) + WebPush  ← إشعار التهبيط ←
   │
   ├─ [إذا تغيّر is_violator من true إلى false] → handleViolatorRemoval()
   │    ├─ Agent::where()->update([violator_since=null, violator_reason=null])
@@ -331,13 +333,15 @@ updated(Agent $agent)
             ├─ $agent->refresh()
             └─ [PROMOTION فقط] Agent::where()->update(club, entry_date, is_first_arrival)
                  ← Query Builder — يتجاوز Observer لمنع infinite loop ←
-                 ← HistoryLog + Reward + Opportunity + AgentNotification (WebPush) ←
+                 ← HistoryLog + Reward + entry Opportunities (dedup) + first_arrival Opportunity (إذا isFirst) + AgentNotification (WebPush) ←
 ```
 
-> **قواعد Observer (الإصدار 2.0):**
+> **قواعد Observer (الإصدار 3.3):**
 > - `handleClubChange()` تُطلق عند تعديل يدوي عبر Eloquent (لا تُطلق من Import الذي يستخدم withoutEvents)
 > - `checkAndApplyPromotion()` تتعامل مع الترقية اليدوية فقط — **لا تهبيط، لا عداد**
-> - لا إشعار للوكيل عند التهبيط — لا في Observer ولا في Import
+> - **الفرص (entry):** 1 فرصة لكل مستوى نادٍ حتى مستوى الهدف — dedup يمنع التكرار حتى عند الترقية المباشرة لنادي القمة
+> - **إشعار التهبيط:** يُرسَل للوكيل عبر `handleClubChange()` (تعديل يدوي) وعبر `approveRequest()` (موافقة على طلب تهبيط)
+> - **إشعار الرفض:** يُرسَل للوكيل عند رفض أي طلب (ترقية أو تهبيط) عبر `rejectRequest()`
 > - الموافقة على طلبات ClubChangeRequest تستخدم Query Builder مباشرة (لا Eloquent) لتجنب تشغيل Observer مرة ثانية
 
 ### 4.3 ProcessAgentImport — استيراد وكلاء جدد
@@ -725,11 +729,11 @@ ProcessDataImport::processAgentRow():
   ├─ قبول التهبيط:
   │    Agent::where()->update(current_club_id = to_club_id)  ← Query Builder
   │    HistoryLog(demotion)
-  │    ← لا إشعار للوكيل ←
+  │    AgentNotification::create(demotion) + WebPush للوكيل  ← إشعار التهبيط ←
   └─ رفض التهبيط:
        ClubChangeRequest::update(status='rejected', rejection_reason)
        HistoryLog(rejection)
-       ← لا إشعار للوكيل ←
+       AgentNotification::create(warning, title='طلب المراجعة لم يُقبَل') + WebPush للوكيل  ← إشعار الرفض ←
 ```
 
 ### 6.6 سيناريو: مراجعة طلب ترقية + تصنيف مخالف (جديد)
@@ -747,7 +751,7 @@ Admin يفتح /admin/club-change-requests:
        Agent::where()->update([current_club_id, entry_date, is_first_arrival])  ← Query Builder
        HistoryLog(promotion)
        Reward::create(base أو first_arrival)
-       Opportunity::create(entry × N)  [+ first_arrival إذا isFirst]
+       entry Opportunity لكل نادٍ حتى مستوى الهدف (dedup) [+ first_arrival إذا isFirst]
        AgentNotification::create(promotion) + $agent->notify(WebPush)  ← إشعار الوكيل
        ClubChangeRequest::update(status='approved', reviewed_by, reviewed_at)
 
@@ -755,7 +759,7 @@ Admin يفتح /admin/club-change-requests:
   → rejectRequest($record, ['rejection_reason' => '...', 'mark_as_violator' => false]):
        ClubChangeRequest::update(status='rejected', rejection_reason, ...)
        HistoryLog(rejection)
-       ← لا إشعار للوكيل ←
+       AgentNotification::create(warning, title='طلب الترقية لم يُقبَل') + WebPush للوكيل  ← إشعار الرفض ←
 
 الحالة 3: رفض الترقية + تصنيف مخالف:
   → rejectRequest($record, ['rejection_reason' => '...', 'mark_as_violator' => true]):
@@ -763,7 +767,7 @@ Admin يفتح /admin/club-change-requests:
        HistoryLog(rejection)
        Agent::where()->update([is_violator=true, violator_since=now(), violator_reason=...])  ← Query Builder
        HistoryLog(violation)
-       ← لا إشعار للوكيل ←
+       AgentNotification::create(warning, title='طلب الترقية لم يُقبَل') + WebPush للوكيل  ← إشعار الرفض ←
        [في Import التالي] الوكيل يُتجاوز كلياً (is_violator=true)
 
 الحالة 4: إلغاء تصنيف المخالف (من EditAgent):
@@ -796,7 +800,7 @@ Admin يفتح /admin/club-change-requests:
 
 | المخاطرة | الخطورة | التفاصيل |
 |---|---|---|
-| ~~**AgentNotification Missing Path**~~ | ✅ مُصلَح | `checkAndApplyPromotion()` يُنشئ `AgentNotification` + WebPush عند الترقية اليدوية. `ClubChangeRequestResource::approveRequest()` يُنشئ `AgentNotification` + WebPush عند قبول ترقية فقط. لا إشعار عند التهبيط أو الرفض أو المخالفة. |
+| ~~**AgentNotification Missing Path**~~ | ✅ مُصلَح (3.3) | جميع مسارات الإشعار مكتملة: ترقية (3 مسارات) ✅، تهبيط يدوي (`handleClubChange`) ✅، قبول تهبيط (`approveRequest`) ✅، رفض أي طلب (`rejectRequest`) ✅، مكافأة ✅. لا إشعار عند إلغاء تصنيف المخالفة — قرار تصميمي. |
 | ~~**Missing DB-level Immutability**~~ | ✅ مُصلَح (2026-06-19) | `HistoryLog` و`AuditLog` يرميان `LogicException` عند استدعاء `performUpdate()` أو `performDeleteOnModel()` — حماية حقيقية لا بتعليق فقط. |
 | **Queue Worker Dependency** | 🟡 متوسطة (مُحسَّن) | إذا توقف Queue Worker، كل imports ستبقى pending بصمت. لا alerting مدمج. **تحسين (2026-06-19):** `tries=1` + `failed()` تضمن تحديث `import.status = 'failed'` حتى عند الـ catastrophic failure قبل الـ try-catch. الحل الكامل (Slack/email alerting) لا يزال مفتوحاً. |
 | **Transaction Locking** | 🟡 متوسطة (مُخففة) | `DB::transaction()` في `ProcessDataImport` يُقفل صفوف `agents`. **تخفيف (2026-06-19):** `SET SESSION innodb_lock_wait_timeout = 5` يجعل تعارض الـ Admin يفشل في 5 ثوانٍ بدلاً من التجمّد 50 ثانية. الحل الجذري (per-row micro-transactions) مُؤجَّل. |
@@ -915,11 +919,13 @@ Admin يفتح /admin/club-change-requests:
 
 > **الإصدار 2.0:** حُذف عمود `demotion_days` — لا يوجد عداد تهبيط في المشروع.
 
-| النادي | club_order | required_increase | required_transfer_count | base_reward | first_arrival_reward | first_arrival_slots | seat_capacity | grand_prize | entry_opportunities | bonus |
+| النادي | club_order | required_increase | required_transfer_count | base_reward | first_arrival_reward | first_arrival_slots | seat_capacity | grand_prize | entry_opportunities¹ | bonus |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Launch Club | 1 | 25 | 15 | 300 ₪ | 600 ₪ | 10 | 90 | 15,000 ₪ | 1 | ❌ |
 | Excellence Club | 2 | 50 | 30 | 700 ₪ | 1,500 ₪ | 5 | 55 | 35,000 ₪ | 2 | ❌ |
 | Peak Club | 3 | 100 | 60 | 1,000 ₪ | 2,000 ₪ | 5 | 45 | 70,000 ₪ | 3 | ✅ (1/20 lines) |
+
+> ¹ **entry_opportunities (الإصدار 3.3):** لا يُستخدم `entry_opportunities` من DB كمُدخَل — الكود يُنشئ فرصة entry واحدة لكل نادٍ حتى مستوى النادي الحالي (club_order ≤ currentClub.club_order) مع dedup. القيم في الجدول (1/2/3) تصف النتيجة الفعلية وتتطابق صدفةً مع club_order.
 
 ---
 
@@ -1206,17 +1212,18 @@ Alpine.js يستقبل الحدث:
 | قبول ترقية — `ClubChangeRequestResource::approveRequest()` | ✅ `promotion` | ✅ (إذا portal_token موجود) | ❌ |
 | ترقية يدوية — `AgentObserver::checkAndApplyPromotion()` | ✅ `promotion` | ✅ (إذا portal_token موجود) | ❌ |
 | ترقية يدوية — `AgentObserver::handleClubChange()` | ✅ `promotion` | ✅ (إذا portal_token موجود) | ❌ |
-| رفض طلب ترقية أو تهبيط | ❌ | ❌ | ❌ |
-| قبول تهبيط — `ClubChangeRequestResource::approveRequest()` | ❌ | ❌ | ❌ |
-| تصنيف مخالف — `ClubChangeRequestResource::rejectRequest()` | ❌ | ❌ | ❌ |
+| رفض طلب ترقية — `ClubChangeRequestResource::rejectRequest()` | ✅ `warning` | ✅ (إذا portal_token موجود) | ❌ |
+| رفض طلب تهبيط — `ClubChangeRequestResource::rejectRequest()` | ✅ `warning` | ✅ (إذا portal_token موجود) | ❌ |
+| قبول تهبيط — `ClubChangeRequestResource::approveRequest()` | ✅ `demotion` | ✅ (إذا portal_token موجود) | ❌ |
+| تهبيط يدوي — `AgentObserver::handleClubChange()` | ✅ `demotion` | ✅ (إذا portal_token موجود) | ❌ |
 | إلغاء تصنيف مخالف — `AgentObserver::handleViolatorRemoval()` | ❌ | ❌ | ❌ |
 | دفع مكافأة (`RewardObserver`) | ✅ `achievement` | ✅ | ❌ |
 | فشل دفع مكافأة (`RewardObserver`) | ✅ `warning` | ✅ | ✅ |
 | فرصة صيانة شهرية (`CreateMonthlyMaintenanceOpportunities`) | ✅ `achievement` | ✅ (إذا portal_token موجود) | ❌ |
 
-> **القاعدة الذهبية (الإصدار 2.0):** الإشعار للوكيل **فقط عند قبول ترقية**. لا إشعار على رفض أو تهبيط أو مخالفة أو إلغاء مخالفة.
+> **قواعد الإشعار (الإصدار 3.3):** ترقية ✅ | تهبيط ✅ | رفض طلب ✅ | مكافأة ✅. لا إشعار عند إلغاء تصنيف المخالفة فقط.
 >
-> **هندسة الإشعارات:** لا `$pendingNotifies` في `ProcessDataImport` بعد الآن — الـ Job لا يُرسل أي إشعارات. الإشعارات تصدر فقط من `ClubChangeRequestResource` (قبول ترقية) أو `AgentObserver` (تعديل يدوي) أو `RewardObserver` (مكافأة).
+> **هندسة الإشعارات:** لا `$pendingNotifies` في `ProcessDataImport` — الـ Job لا يُرسل أي إشعارات. الإشعارات تصدر فقط من `ClubChangeRequestResource` (قبول/رفض ترقية أو تهبيط) أو `AgentObserver` (تعديل يدوي) أو `RewardObserver` (مكافأة).
 
 **WebPush:** package `laravel-notification-channels/webpush` — VAPID keys في `.env`.
 **SMS:** abstraction layer — `SmsDriver` interface → `NullSmsDriver` (dev) / `UnifonicSmsDriver` (prod).
@@ -1354,6 +1361,7 @@ ProcessAgentSelfSync::handle()
 
 *هذا المستند تم توليده بتحليل الكود المصدري الكامل للمشروع بتاريخ 2026-05-01.*
 *آخر تحديث: 2026-06-18 — الإصدار 2.0: نظام Approval Flow لطلبات تغيير النادي (ClubChangeRequestResource) + حذف عداد التهبيط نهائياً + تصنيف المخالفين (is_violator) + قاعدة الإشعار للوكيل عند قبول الترقية فقط.*
+*آخر تحديث: 2026-06-30 (الإصدار 3.3 — إعادة تصميم الفرص + إشعارات التهبيط والرفض) — نظام الفرص: كل ترقية تُنشئ فرصة entry واحدة لكل مستوى نادٍ حتى النادي الحالي (dedup pluck+in_array بدل N+1 queries) — وكيل ينتقل مباشرة لنادي القمة يحصل على 3 فرص دفعة واحدة. إصلاح `checkAndApplyPromotion()`: كانت تفتقر لفرصة first_arrival — أُضيفت. إشعار التهبيط: يُرسَل الآن في مسارين: handleClubChange (تعديل يدوي) + approveRequest (موافقة على تهبيط). إشعار الرفض: يُرسَل عند رفض أي طلب (ترقية أو تهبيط) عبر rejectRequest. تحديث §4.2، §6.4، §6.6، §7.1، §9، §12.6.*
 *آخر تحديث: 2026-05-23 — إصلاح إشعارات ProcessDataImport (TD-006): إضافة AgentNotification لكل الأحداث + $pendingNotifies pattern لإرسال WebPush/SMS بعد الـ transaction. إصلاح NotificationBell تزامن (TD-007). إصلاح AudioContext singleton (TD-008). تحديث §7.1 و§12.6. إصلاح شرط تأهيل النادي (TD-009): إضافة required_transfer_count للفلترة في AgentObserver + ProcessDataImport + AgentResource + CreateAgent — كان عداد التهبيط لا يبدأ عند نسبة تحويل < 60%. تحديث §4.4 و§6.4.*
 *آخر تحديث: 2026-05-23 (مراجعة نظام الإشعارات) — تصحيح اسم جدول `notifications` (كان خطأً `agent_notifications`) في §2.1. إضافة §2.1.1 بـ schema كامل لجدول notifications (15 حقل + indexes). تصحيح enum notification_type من 4 إلى 6 أنواع (milestone, progress). تحديث خريطة الأصوات في §12.5 (نغمة مختلفة لكل نوع). تحديث وصف NotificationBell في §12.4 (max 3 toasts، 6 أنواع). إضافة صف الفرصة الشهرية في جدول §12.6. إضافة §5.8 Console Commands (SyncDailyNumbers + CreateMonthlyMaintenanceOpportunities). إضافة AppSetting model في §5.1.*
 *آخر تحديث: 2026-06-09 (Deals API Auto-Sync + تدقيق شامل) — إضافة §5.5.1 صفحة `DealsApiSettings` (مزامنة أرقام الوكلاء). إضافة §12.3.1 `SyncStatusBadge` (client-driven auto-sync عبر Alpine.js). إضافة `SyncAgentDeals` في §5.8. توثيق `ProcessDistributorSync` job (§5.2). توثيق 4 صفحات API settings ناقصة (§5.5.1). إضافة `AgentsStatsWidget` (§3.3). تحديث DistributorOverviewWidget (§3.4). إضافة DistributorLogin (§3.5). توثيق 22 Blade file في §5.7 (كانت ناقصة). توسيع جدول AppSetting لـ 15 مفتاح مع الاستخدام (§5.8). تحديث DataImport schema (source_type=deals_api، progress، error_details، حذف unique constraint).*

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\AgentResource\Pages;
 
 use App\Exports\AgentsExport;
-use App\Exports\ApproachingAgentsExport;
 use App\Exports\FunnelStageExport;
 use App\Filament\Resources\AgentResource;
 use App\Filament\Widgets\AgentsStatsWidget;
@@ -33,26 +32,6 @@ class ListAgents extends ListRecords
                 ->action(function () {
                     $agents = Agent::with(['club', 'distributor'])->orderBy('agent_name')->get();
                     return app(AgentsExport::class)->download($agents);
-                }),
-            Action::make('export_approaching')
-                ->label('وكلاء قريبون من نادي الانطلاق')
-                ->icon('heroicon-o-arrow-trending-up')
-                ->color('warning')
-                ->action(function () {
-                    $antelaaq     = Club::where('club_order', 1)->where('is_active', true)->first();
-                    $halfIncrease = (int) ceil(($antelaaq?->required_increase ?? 25) / 2);
-                    $halfTransfer = (int) ceil(($antelaaq?->required_transfer_count ?? 15) / 2);
-
-                    $agents = Agent::with('distributor')
-                        ->whereNull('current_club_id')
-                        ->where(function (Builder $q) use ($halfIncrease, $halfTransfer) {
-                            $q->whereRaw('(new_line_count + transfer_count) >= ?', [$halfIncrease])
-                              ->orWhere('transfer_count', '>=', $halfTransfer);
-                        })
-                        ->orderByRaw('(new_line_count + transfer_count) DESC')
-                        ->get();
-
-                    return app(ApproachingAgentsExport::class)->download($agents, $antelaaq);
                 }),
             Action::make('export_funnel')
                 ->label('تصدير الفئة')
