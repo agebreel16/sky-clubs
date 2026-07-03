@@ -46,6 +46,10 @@ class AgentDealsReportPdf
             'format'          => 'A4',
             'default_font'    => 'cairo',
             'directionality'  => 'rtl',
+            // مجلد الكاش الافتراضي لـ mPDF داخل vendor/ قد لا يكون قابلاً للكتابة
+            // على سيرفرات الإنتاج (يملكه مستخدم النشر لا مستخدم الويب سيرفر)،
+            // بعكس storage/ اللي لارافيل نفسها تتطلب تكون قابلة للكتابة دائماً.
+            'tempDir'         => storage_path('app/mpdf-temp'),
             'margin_left'     => 16,
             'margin_right'    => 16,
             'margin_top'      => 16,
