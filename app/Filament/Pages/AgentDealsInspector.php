@@ -37,6 +37,8 @@ class AgentDealsInspector extends Page
     public ?array $filterData = [];
 
     public array $reportRows = [];
+    public array $rawResponses = [];
+    public array $statusBreakdown = [];
     public ?string $reportAgentLabel = null;
     public ?string $reportAgentId = null;
     public ?string $reportFrom = null;
@@ -148,9 +150,12 @@ class AgentDealsInspector extends Page
 
         $queryDays = $queryDays->unique()->values();
 
-        $cumulativeNew       = [];
-        $cumulativeTransfer  = [];
-        $failedDays          = [];
+        $cumulativeNew        = [];
+        $cumulativeTransfer   = [];
+        $cumulativeDeactivated = [];
+        $failedDays           = [];
+        $this->rawResponses   = [];
+        $this->statusBreakdown = [];
 
         foreach ($queryDays->chunk(20) as $batch) {
             $responses = Http::pool(function (Pool $pool) use ($batch, $url, $username, $password, $agent, $campaignStart) {
@@ -172,10 +177,14 @@ class AgentDealsInspector extends Page
 
                 if (! $response || $response instanceof \Exception) {
                     $failedDays[] = $day;
+                    $this->rawResponses[$day] = [
+                        '__error' => $response instanceof \Exception ? $response->getMessage() : 'لا استجابة من الـ API',
+                    ];
                     continue;
                 }
 
                 $body = $response->json();
+                $this->rawResponses[$day] = $body;
 
                 if (($body['result'] ?? '') !== 'SUCCESS') {
                     $failedDays[] = $day;
@@ -184,19 +193,27 @@ class AgentDealsInspector extends Page
 
                 $apiRows = collect($body['data'] ?? []);
 
-                $cumulativeNew[$day]      = (int) $apiRows->where('task_name', 'new-order')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
-                $cumulativeTransfer[$day] = (int) $apiRows->where('task_name', 'number-portability')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
+                $cumulativeNew[$day]         = (int) $apiRows->where('task_name', 'new-order')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
+                $cumulativeTransfer[$day]    = (int) $apiRows->where('task_name', 'number-portability')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
+                // "الملغى": أي صفقة (جديدة أو تحويل) حالتها غير Activated — معلومة تفسيرية لا تدخل بأي حساب أساسي
+                $cumulativeDeactivated[$day] = (int) $apiRows->where('status', '!=', 'Activated')->sum(fn ($r) => (int) $r['count']);
+
+                // تفصيل كامل (نوع الخط × الحالة) — تشخيصي بحت لمراقبة سلوك التجديد/التوقف، بدون تأثير على أي حساب أساسي
+                $this->statusBreakdown[$day] = [
+                    'new-order'          => $apiRows->where('task_name', 'new-order')->groupBy('status')->map(fn ($group) => (int) $group->sum(fn ($r) => (int) $r['count']))->all(),
+                    'number-portability' => $apiRows->where('task_name', 'number-portability')->groupBy('status')->map(fn ($group) => (int) $group->sum(fn ($r) => (int) $r['count']))->all(),
+                ];
             }
         }
 
         // أي يوم قبل بداية الحملة يُعتبر تراكمياً صفراً دون الحاجة لاستعلامه من الـ API
-        $getCumulative = function (string $day) use ($campaignStart, $cumulativeNew, $cumulativeTransfer): ?array {
+        $getCumulative = function (string $day) use ($campaignStart, $cumulativeNew, $cumulativeTransfer, $cumulativeDeactivated): ?array {
             if (Carbon::parse($day)->lt($campaignStart)) {
-                return ['new' => 0, 'transfer' => 0];
+                return ['new' => 0, 'transfer' => 0, 'deactivated' => 0];
             }
 
-            if (isset($cumulativeNew[$day], $cumulativeTransfer[$day])) {
-                return ['new' => $cumulativeNew[$day], 'transfer' => $cumulativeTransfer[$day]];
+            if (isset($cumulativeNew[$day], $cumulativeTransfer[$day], $cumulativeDeactivated[$day])) {
+                return ['new' => $cumulativeNew[$day], 'transfer' => $cumulativeTransfer[$day], 'deactivated' => $cumulativeDeactivated[$day]];
             }
 
             return null;
@@ -211,13 +228,14 @@ class AgentDealsInspector extends Page
 
             if (Carbon::parse($day)->lt($campaignStart)) {
                 $rows[] = [
-                    'date'            => $day,
-                    'daily_new'       => 0,
-                    'daily_transfer'  => 0,
-                    'daily_total'     => 0,
-                    'cumulative_total'=> 0,
-                    'status'          => 'قبل بداية الحملة',
-                    'ok'              => true,
+                    'date'             => $day,
+                    'daily_new'        => 0,
+                    'daily_transfer'   => 0,
+                    'daily_total'      => 0,
+                    'daily_deactivated'=> 0,
+                    'cumulative_total' => 0,
+                    'status'           => 'قبل بداية الحملة',
+                    'ok'               => true,
                 ];
                 continue;
             }
@@ -228,28 +246,31 @@ class AgentDealsInspector extends Page
             if (! $current || ! $previous) {
                 $incompleteCount++;
                 $rows[] = [
-                    'date'            => $day,
-                    'daily_new'       => null,
-                    'daily_transfer'  => null,
-                    'daily_total'     => null,
-                    'cumulative_total'=> $current ? ($current['new'] + $current['transfer']) : null,
-                    'status'          => 'غير مكتمل',
-                    'ok'              => false,
+                    'date'             => $day,
+                    'daily_new'        => null,
+                    'daily_transfer'   => null,
+                    'daily_total'      => null,
+                    'daily_deactivated'=> null,
+                    'cumulative_total' => $current ? ($current['new'] + $current['transfer']) : null,
+                    'status'           => 'غير مكتمل',
+                    'ok'               => false,
                 ];
                 continue;
             }
 
-            $dailyNew      = $current['new'] - $previous['new'];
-            $dailyTransfer = $current['transfer'] - $previous['transfer'];
+            $dailyNew         = $current['new'] - $previous['new'];
+            $dailyTransfer    = $current['transfer'] - $previous['transfer'];
+            $dailyDeactivated = $current['deactivated'] - $previous['deactivated'];
 
             $rows[] = [
-                'date'            => $day,
-                'daily_new'       => $dailyNew,
-                'daily_transfer'  => $dailyTransfer,
-                'daily_total'     => $dailyNew + $dailyTransfer,
-                'cumulative_total'=> $current['new'] + $current['transfer'],
-                'status'          => 'تم',
-                'ok'              => true,
+                'date'             => $day,
+                'daily_new'        => $dailyNew,
+                'daily_transfer'   => $dailyTransfer,
+                'daily_total'      => $dailyNew + $dailyTransfer,
+                'daily_deactivated'=> $dailyDeactivated,
+                'cumulative_total' => $current['new'] + $current['transfer'],
+                'status'           => 'تم',
+                'ok'               => true,
             ];
         }
 
@@ -269,6 +290,34 @@ class AgentDealsInspector extends Page
         } else {
             Notification::make()->title('تم جلب التقرير بنجاح')->success()->send();
         }
+    }
+
+    public function rawResponseFor(string $day): ?string
+    {
+        if (! isset($this->rawResponses[$day])) {
+            return null;
+        }
+
+        return json_encode($this->rawResponses[$day], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    // الحالات المعروفة حالياً بالـ API — أي حالة تانية غير هذول بتظهر تلقائياً بصف "أخرى" بالعرض
+    public function knownStatuses(): array
+    {
+        return ['Activated', 'Deactivated', 'Terminate'];
+    }
+
+    public function statusCountFor(string $day, string $taskName, string $status): int
+    {
+        return $this->statusBreakdown[$day][$taskName][$status] ?? 0;
+    }
+
+    // أي حالة ظهرت فعلياً بالرد ومش من ضمن knownStatuses() — احتياطاً لظهور حالة رابعة غير موثّقة
+    public function otherStatusesFor(string $day, string $taskName): array
+    {
+        return collect($this->statusBreakdown[$day][$taskName] ?? [])
+            ->reject(fn ($count, $status) => in_array($status, $this->knownStatuses(), true))
+            ->all();
     }
 
     public function exportPdf(): ?StreamedResponse

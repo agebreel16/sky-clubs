@@ -21,9 +21,7 @@
         API خطوط الوكلاء
     </p>
     <span style="font-size:22px; font-weight:800; color:#fff; letter-spacing:-.3px;">تقرير مفصل لأرقام وكيل</span>
-    <p style="margin:8px 0 0; font-size:13px; color:rgba(191,219,254,0.85); max-width:620px; line-height:1.6;">
-        اختر وكيلاً وفترة زمنية، وسيتم إرسال طلب منفصل للـ API عن كل يوم بالفترة لمقارنة الأرقام يوماً بيوم.
-    </p>
+
 </div>
 
 {{-- ── Filter Form ── --}}
@@ -98,7 +96,11 @@
     </div>
 
     <div style="margin:16px 0 8px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-        <p style="margin:0; font-size:13px; color:#6b7280;">الوكيل: <strong style="color:#111827;">{{ $this->reportAgentLabel }}</strong></p>
+        <p style="margin:0; font-size:13px; color:#6b7280;">
+            الوكيل: <strong style="color:#111827;">{{ $this->reportAgentLabel }}</strong>
+            <span style="margin:0 10px; color:#d1d5db;">|</span>
+            الفترة: <strong style="color:#111827;">{{ $this->reportFrom }}</strong> إلى <strong style="color:#111827;">{{ $this->reportUntil }}</strong>
+        </p>
         <x-filament::button wire:click="exportPdf" wire:loading.attr="disabled" color="gray" icon="heroicon-o-document-arrow-down">
             <span wire:loading.remove wire:target="exportPdf">تصدير PDF</span>
             <span wire:loading wire:target="exportPdf">جارٍ التصدير...</span>
@@ -143,15 +145,17 @@
             <thead>
                 <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
                     <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">التاريخ</th>
-                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">جديد (يومي)</th>
-                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">تحويل (يومي)</th>
-                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">إجمالي (يومي)</th>
-                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">إجمالي تراكمي</th>
+                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">خطوط جديدة</th>
+                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">خطوط تحويل</th>
+                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">الإجمالي يومي</th>
+                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">الإجمالي التراكمي</th>
+                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">الملغى</th>
                     <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">الحالة</th>
+                    <th style="padding:10px 16px; text-align:right; color:#374151; font-weight:600;">رد الـ API</th>
                 </tr>
             </thead>
-            <tbody>
-                @foreach ($rows as $row)
+            @foreach ($rows as $row)
+                <tbody x-data="{ open: false }">
                     <tr style="border-bottom:1px solid #f3f4f6;">
                         <td style="padding:9px 16px; color:#111827;">{{ $row['date'] }}</td>
                         <td style="padding:9px 16px; color:#111827;">{{ $row['daily_new'] ?? '—' }}</td>
@@ -160,6 +164,9 @@
                             {{ $row['daily_total'] ?? '—' }}
                         </td>
                         <td style="padding:9px 16px; color:#6b7280;">{{ $row['cumulative_total'] ?? '—' }}</td>
+                        <td style="padding:9px 16px; color:{{ ($row['daily_deactivated'] ?? 0) > 0 ? '#b45309' : '#9ca3af' }}; font-weight:{{ ($row['daily_deactivated'] ?? 0) > 0 ? '700' : '400' }};">
+                            {{ $row['daily_deactivated'] ?? '—' }}
+                        </td>
                         <td style="padding:9px 16px;">
                             @if($row['status'] === 'تم')
                                 <span style="color:#16a34a; font-weight:600;">✓ تم</span>
@@ -169,9 +176,74 @@
                                 <span style="color:#dc2626; font-weight:600;">غير مكتمل</span>
                             @endif
                         </td>
+                        <td style="padding:9px 16px;">
+                            @if($row['status'] !== 'قبل بداية الحملة')
+                                <button type="button" @click="open = !open"
+                                        style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;font-size:12px;cursor:pointer;">
+                                    <span x-text="open ? 'إخفاء' : 'عرض'"></span>
+                                </button>
+                            @else
+                                <span style="color:#d1d5db;">—</span>
+                            @endif
+                        </td>
                     </tr>
-                @endforeach
-            </tbody>
+                    @if($row['status'] !== 'قبل بداية الحملة')
+                        <tr x-show="open" x-cloak style="border-bottom:1px solid #f3f4f6;">
+                            <td colspan="8" style="padding:14px 16px; background:#f9fafb;">
+
+                                {{-- التاريخين الفعليين المُرسلين للـ API لهذا الصف (from ثابت = بداية الحملة، to = تاريخ هذا الصف) --}}
+                                <p style="margin:0 0 12px; font-size:12px; color:#6b7280;">
+                               الطلب 
+                                    <strong style="color:#111827; direction:ltr; display:inline-block;">من {{ $this->campaignStartLabel }} إلى {{ $row['date'] }}</strong>
+                 
+                                </p>
+
+                                {{-- ملخّص مقروء: نوع الخط × الحالة (تشخيصي — لا يدخل بأي حساب) --}}
+                             
+                                <table style="width:100%; max-width:520px; border-collapse:collapse; font-size:12px; margin-bottom:12px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding:6px 10px; text-align:right; color:#6b7280; border-bottom:1px solid #e5e7eb;"></th>
+                                            @foreach($this->knownStatuses() as $status)
+                                                <th style="padding:6px 10px; text-align:center; color:#6b7280; border-bottom:1px solid #e5e7eb;">{{ $status }}</th>
+                                            @endforeach
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="padding:6px 10px; color:#374151; font-weight:600;">خطوط جديدة</td>
+                                            @foreach($this->knownStatuses() as $status)
+                                                <td style="padding:6px 10px; text-align:center; color:#111827;">{{ $this->statusCountFor($row['date'], 'new-order', $status) }}</td>
+                                            @endforeach
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:6px 10px; color:#374151; font-weight:600;">خطوط تحويل</td>
+                                            @foreach($this->knownStatuses() as $status)
+                                                <td style="padding:6px 10px; text-align:center; color:#111827;">{{ $this->statusCountFor($row['date'], 'number-portability', $status) }}</td>
+                                            @endforeach
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                @php
+                                    $otherNew = $this->otherStatusesFor($row['date'], 'new-order');
+                                    $otherTransfer = $this->otherStatusesFor($row['date'], 'number-portability');
+                                @endphp
+                                @if(count($otherNew) || count($otherTransfer))
+                                    <p style="margin:0 0 12px; font-size:12px; color:#b45309; font-weight:600;">
+                                        ⚠ حالات إضافية غير معروفة —
+                                        @foreach($otherNew as $status => $count) خطوط جديدة/{{ $status }}: {{ $count }} @endforeach
+                                        @foreach($otherTransfer as $status => $count) خطوط تحويل/{{ $status }}: {{ $count }} @endforeach
+                                    </p>
+                                @endif
+
+                                <p style="margin:0 0 6px; font-size:12px; font-weight:700; color:#374151;">الرد الخام (JSON)</p>
+                                <pre style="margin:0; direction:ltr; text-align:left; font-size:11px; line-height:1.6; white-space:pre-wrap; word-break:break-all; color:#374151; max-height:320px; overflow:auto;">{{ $this->rawResponseFor($row['date']) ?? 'لا يوجد رد محفوظ لهذا اليوم' }}</pre>
+                            </td>
+                        </tr>
+                    @endif
+                </tbody>
+            @endforeach
         </table>
     </div>
 @endif

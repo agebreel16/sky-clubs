@@ -78,21 +78,13 @@
     .num-pos-transfer { font-weight: 800; color: #2169E9; }
     .num-neg { font-weight: 800; color: #dc2626; }
     .num-cumulative { font-weight: 800; color: #14294f; }
+    .num-deactivated { font-weight: 800; color: #b45309; }
     .num-muted { color: #8a93a3; }
 
     .pill { font-size: 12px; font-weight: 700; padding: 3px 12px; border-radius: 20px; }
     .pill-ok { background: #eaf6ee; color: #1a7a4c; }
     .pill-bad { background: #fdecea; color: #dc2626; }
     .pill-muted { background: #f4f5f8; color: #8a93a3; }
-
-    .footer-note {
-        margin-top: 26px;
-        padding-top: 14px;
-        border-top: 1px solid #e4e7ee;
-        font-size: 11.5px;
-        color: #8a93a3;
-        line-height: 1.8;
-    }
 </style>
 </head>
 <body>
@@ -176,10 +168,11 @@
     <thead>
         <tr>
             <th>التاريخ</th>
-            <th>جديد (يومي)</th>
-            <th>تحويل (يومي)</th>
-            <th>إجمالي (يومي)</th>
-            <th>إجمالي تراكمي</th>
+            <th>خطوط جديدة</th>
+            <th>خطوط تحويل</th>
+            <th>الإجمالي يومي</th>
+            <th>الإجمالي التراكمي</th>
+            <th>الملغى</th>
             <th>الحالة</th>
         </tr>
     </thead>
@@ -190,9 +183,12 @@
                 $transfer = $row['daily_transfer'];
                 $total = $row['daily_total'];
 
+                $deactivated = $row['daily_deactivated'] ?? null;
+
                 $newClass = $new === null ? '' : ($new < 0 ? 'num-neg' : ($new > 0 ? 'num-pos-new' : 'num-zero'));
                 $transferClass = $transfer === null ? '' : ($transfer < 0 ? 'num-neg' : ($transfer > 0 ? 'num-pos-transfer' : 'num-muted'));
                 $totalClass = $total === null ? '' : ($total < 0 ? 'num-neg' : ($total > 0 ? 'num-pos-total' : 'num-zero'));
+                $deactivatedClass = $deactivated === null ? '' : ($deactivated > 0 ? 'num-deactivated' : 'num-muted');
             @endphp
             <tr class="{{ $i % 2 === 0 ? 'odd' : 'even' }}" style="break-inside:avoid;">
                 <td><span class="ltr">{{ $row['date'] }}</span></td>
@@ -200,6 +196,7 @@
                 <td class="num-cell {{ $transferClass }}"><span class="ltr">{{ $transfer ?? '—' }}</span></td>
                 <td class="num-cell {{ $totalClass }}"><span class="ltr">{{ $total ?? '—' }}</span></td>
                 <td class="num-cell num-cumulative"><span class="ltr">{{ $row['cumulative_total'] ?? '—' }}</span></td>
+                <td class="num-cell {{ $deactivatedClass }}"><span class="ltr">{{ $deactivated ?? '—' }}</span></td>
                 <td>
                     @if($row['status'] === 'تم')
                         <span class="pill pill-ok">تم</span>
@@ -213,10 +210,6 @@
         @endforeach
     </tbody>
 </table>
-
-<div class="footer-note">
-    تم توليد هذا التقرير بشكل آلي من نظام <span class="ltr">SKY CLUB</span> عبر استعلام مباشر لواجهة برمجة تطبيقات خطوط الوكلاء. القيم اليومية محسوبة بالفرق بين الإجمالي التراكمي ليومين متتاليين.
-</div>
 
 </body>
 </html>
