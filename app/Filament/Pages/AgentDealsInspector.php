@@ -25,9 +25,6 @@ class AgentDealsInspector extends Page
 
     protected const MAX_RANGE_DAYS = 120;
 
-    // تاريخ قديم بما يكفي ليشمل كل الخطوط قبل بداية الحملة عند استعلام "حتى تاريخ بداية الحملة"
-    protected const LIFETIME_ANCHOR_DATE = '2000-01-01';
-
     public static function getNavigationLabel(): string  { return 'تقرير مفصل لأرقام وكيل'; }
     public static function getNavigationGroup(): ?string { return 'البيانات والمزامنة'; }
     public static function getNavigationIcon(): string   { return 'heroicon-o-magnifying-glass'; }
@@ -50,6 +47,11 @@ class AgentDealsInspector extends Page
     public ?int $postCampaignLineCount = null;
     public bool $preCampaignFailed = false;
     public bool $postCampaignFailed = false;
+
+    // رقم "الفعّال حالياً" من GetSubCustomerActiveSubs — لمقارنته مع current_total المخزّن فقط (تشخيصي، لا يدخل بأي حساب)
+    public ?int $activeSubsCount = null;
+    public bool $activeSubsFailed = false;
+    public ?int $reportAgentCurrentTotal = null;
 
     public function mount(): void
     {
@@ -128,13 +130,18 @@ class AgentDealsInspector extends Page
 
         $this->campaignStartLabel = $campaignStart->format('Y-m-d');
 
-        $preCampaign  = $this->fetchCumulativeCount($url, $username, $password, $agent->agent_id, self::LIFETIME_ANCHOR_DATE, $campaignStart->format('Y-m-d'));
-        $postCampaign = $this->fetchCumulativeCount($url, $username, $password, $agent->agent_id, $campaignStart->format('Y-m-d'), today()->format('Y-m-d'));
+        // active_subs (GetSubCustomerActiveSubs) هو رقم لحظي كامل (قديم + حملة) — لا يتأثر بأي from/to
+        $this->activeSubsCount         = $this->fetchActiveSubsCount($url, $username, $password, $agent->agent_id);
+        $this->activeSubsFailed        = $this->activeSubsCount === null;
+        $this->reportAgentCurrentTotal = $agent->current_total;
 
-        $this->preCampaignLineCount  = $preCampaign;
-        $this->postCampaignLineCount = $postCampaign;
-        $this->preCampaignFailed     = $preCampaign === null;
-        $this->postCampaignFailed    = $postCampaign === null;
+        // عدد الخطوط قبل بداية الحملة: مخزّن مباشرة من إكسل الحملة الأساسي — ليس من أي API
+        $this->preCampaignLineCount = $agent->pre_campaign_count;
+        $this->preCampaignFailed    = false;
+
+        // عدد الخطوط من بداية الحملة حتى اليوم = نفس الرقم اللحظي الكامل (active_subs يمثّل الإجمالي الحقيقي الآن)
+        $this->postCampaignLineCount = $this->activeSubsCount;
+        $this->postCampaignFailed    = $this->activeSubsFailed;
 
         // يوم الأساس اللازم لحساب الفرق اليومي لأول يوم بالفترة
         $baselineDay = $from->copy()->subDay();
@@ -349,16 +356,17 @@ class AgentDealsInspector extends Page
         ]);
     }
 
-    private function fetchCumulativeCount(string $url, string $username, ?string $password, string $agentId, string $from, string $to): ?int
+    // رقم لقطة حالية من مصدر مستقل (GetSubCustomerActiveSubs) — لا يتأثر بـ from/to، تشخيصي فقط لمقارنته مع current_total
+    private function fetchActiveSubsCount(string $url, string $username, ?string $password, string $agentId): ?int
     {
         try {
             $response = Http::withoutVerifying()
-                ->timeout(30)
+                ->timeout(15)
                 ->post($url, [
                     'username'  => $username,
                     'password'  => $password,
-                    'apiName'   => 'GetSubCustomerDeals',
-                    'wildcards' => [$agentId, $from, $to],
+                    'apiName'   => 'GetSubCustomerActiveSubs',
+                    'wildcards' => [$agentId, today()->format('Y-m-d'), today()->format('Y-m-d')],
                 ]);
         } catch (\Exception) {
             return null;
@@ -370,11 +378,8 @@ class AgentDealsInspector extends Page
             return null;
         }
 
-        $rows = collect($body['data'] ?? []);
+        $row = collect($body['data'] ?? [])->first();
 
-        $newLines  = (int) $rows->where('task_name', 'new-order')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
-        $transfers = (int) $rows->where('task_name', 'number-portability')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
-
-        return $newLines + $transfers;
+        return $row !== null ? (int) ($row['active_subs'] ?? 0) : null;
     }
 }

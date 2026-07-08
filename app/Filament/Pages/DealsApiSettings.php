@@ -31,6 +31,9 @@ class DealsApiSettings extends Page
     public ?string $connectionStatus = null;
     public string  $connectionError  = '';
 
+    public ?string $activeSubsStatus = null;
+    public string  $activeSubsError  = '';
+
     public function mount(): void
     {
         $this->deals_api_url             = AppSetting::get('deals_api_url',             $this->deals_api_url);
@@ -128,6 +131,28 @@ class DealsApiSettings extends Page
         } catch (\Exception $e) {
             $this->connectionStatus = 'failed';
             $this->connectionError  = $e->getMessage();
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(10)
+                ->post($url, [
+                    'username'  => $username,
+                    'password'  => $password,
+                    'apiName'   => 'GetSubCustomerActiveSubs',
+                    'wildcards' => ['TEST_CONNECTION', $from, now()->format('Y-m-d')],
+                ]);
+
+            if ($response->json() !== null) {
+                $this->activeSubsStatus = 'success';
+                $this->activeSubsError  = '';
+            } else {
+                $this->activeSubsStatus = 'failed';
+                $this->activeSubsError  = 'السيرفر لم يرد بـ JSON — HTTP ' . $response->status();
+            }
+        } catch (\Exception $e) {
+            $this->activeSubsStatus = 'failed';
+            $this->activeSubsError  = $e->getMessage();
         }
     }
 

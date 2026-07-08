@@ -337,20 +337,42 @@
             </button>
 
             {{-- نتيجة الاختبار --}}
-            @if($connectionStatus === 'success')
-                <span style="display:inline-flex;align-items:center;gap:5px;color:#16a34a;font-size:13px;font-weight:600;">
-                    <svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    الاتصال ناجح
-                </span>
-            @elseif($connectionStatus === 'failed')
-                <span style="display:inline-flex;align-items:flex-start;gap:5px;color:#dc2626;font-size:12px;max-width:280px;line-height:1.4;">
-                    <svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                    </svg>
-                    <span><strong>فشل</strong> — {{ $connectionError }}</span>
-                </span>
+            @if($connectionStatus !== null || $activeSubsStatus !== null)
+                <div style="display:flex; flex-direction:column; gap:6px;">
+
+                    @if($connectionStatus === 'success')
+                        <span style="display:inline-flex;align-items:center;gap:5px;color:#16a34a;font-size:13px;font-weight:600;">
+                            <svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            GetSubCustomerDeals — الاتصال ناجح
+                        </span>
+                    @elseif($connectionStatus === 'failed')
+                        <span style="display:inline-flex;align-items:flex-start;gap:5px;color:#dc2626;font-size:12px;max-width:320px;line-height:1.4;">
+                            <svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            <span><strong>GetSubCustomerDeals — فشل</strong> — {{ $connectionError }}</span>
+                        </span>
+                    @endif
+
+                    @if($activeSubsStatus === 'success')
+                        <span style="display:inline-flex;align-items:center;gap:5px;color:#16a34a;font-size:13px;font-weight:600;">
+                            <svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            GetSubCustomerActiveSubs — الاتصال ناجح
+                        </span>
+                    @elseif($activeSubsStatus === 'failed')
+                        <span style="display:inline-flex;align-items:flex-start;gap:5px;color:#dc2626;font-size:12px;max-width:320px;line-height:1.4;">
+                            <svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                            </svg>
+                            <span><strong>GetSubCustomerActiveSubs — فشل</strong> — {{ $activeSubsError }}</span>
+                        </span>
+                    @endif
+
+                </div>
             @endif
 
         </div>

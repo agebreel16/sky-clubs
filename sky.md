@@ -438,6 +438,41 @@ match($action) {
 
 ---
 
+### 4.5 Deals API — نقطتان (`GetSubCustomerDeals` مقابل `GetSubCustomerActiveSubs`) (آخر تحديث 2026-07-09)
+
+النظام يستدعي مزوّد الاتصالات (sky5g، endpoint واحد `.../ipa/apis/json/internal/generic/v2`، الفرق فقط بـ `apiName`) بطريقتين مختلفتين تماماً في البنية، **وأصبح يدمج الاثنين معاً فعلياً بالمزامنة الجماعية** (تغيير جوهري عن الإصدار السابق):
+
+| | `GetSubCustomerDeals` | `GetSubCustomerActiveSubs` |
+|---|---|---|
+| **الاستدعاء** | `wildcards: [uuid, from, to]` — يحترم النطاق الزمني فعلياً | نفس الشكل، لكن `from`/`to` **مُتجاهَلان فعلياً من السيرفر** (نفس النتيجة بأي مدى تاريخ حتى لو كان بالكامل قبل بداية الحملة — مؤكَّد بـ 3 اختبارات مباشرة بمدايات مختلفة تماماً) |
+| **الاستجابة** | صفوف متعددة `task_name` (`new-order`/`number-portability`) × `status` (`Activated`/`Deactivated`/`Terminate`) × `count` | صف واحد فقط: `{"active_subs": "N", "status": "Activated"}` — **لا يوجد `task_name`** |
+| **الدلالة** | تراكمي حسب الفترة المطلوبة، قابل لحساب الفرق اليومي | **رقم لحظي كامل** لكل الأرقام الفعّالة عند الوكيل الآن — **يشمل القديم (pre-campaign) والحملة معاً**، وليس رقماً خاصاً بفترة الحملة فقط (مؤكَّد تجريبياً) |
+
+**الصيغة الحالية المطبَّقة فعلياً في `ProcessDataImport::readDealsApi()`** (المزامنة الجماعية عبر `/admin/deals-api-settings`):
+```
+transfer_count  = GetSubCustomerDeals → مجموع count حيث task_name=number-portability AND status=Activated
+active_subs     = GetSubCustomerActiveSubs → قيمة active_subs (لقطة لحظية كاملة)
+current_total   = active_subs  مباشرة
+new_line_count  = max(0, active_subs − transfer_count)   ← بدون طرح pre_campaign_count
+pre_campaign_count / baseline_count = بدون تغيير — من إكسل الحملة فقط، لا تلمسهم هذه المزامنة إطلاقاً
+```
+
+**⚠️ قرار عمل مقصود (وليس خللاً) — انظر أيضاً §8 "قرار عمل: new_line_count يشمل الرصيد القديم":** بما أن `active_subs` يشمل كل رصيد الوكيل القديم، فـ `new_line_count` المشتق لأصحاب `pre_campaign_count` الكبير سيكون مضخَّماً بمقدار قريب من رصيدهم القديم بالكامل — وهذا تعارض معروف مع مبدأ TD-004 (الذي يفترض `campaign_increase` = إضافات الحملة الصافية فقط). تم فحص الأثر كمياً وعُرض على صاحب المشروع (مثال: وكيل تأهّل لنادي القمة 70,000₪ بدل نادي التفوق 35,000₪ الصحيح) — وتمت الموافقة الصريحة على المتابعة بهذه الصيغة بتاريخ 2026-07-09.
+
+**استثناء متعمَّد — `ProcessAgentSelfSync` لم يتحدّث:** مزامنة الوكيل الذاتية من بوابته (زر "مزامنة الآن" الشخصي) **لا تزال تعتمد فقط على `GetSubCustomerDeals`** لكلا الحقلين (`new-order` لـ `new_line_count`، `number-portability` لـ `transfer_count`) — بقرار صريح من صاحب المشروع، ما يعني أن أرقام الوكيل قد تختلف مؤقتاً بين المزامنة الجماعية والمزامنة الذاتية لنفس الوكيل حتى تُشغَّل المزامنة الجماعية التالية.
+
+**نقاط الاستخدام:**
+| الملف | يستخدم |
+|---|---|
+| `ProcessDataImport::readDealsApi()` | كلا الـ API (الصيغة أعلاه) |
+| `ProcessAgentSelfSync` | `GetSubCustomerDeals` فقط (لم يتحدّث) |
+| `DealsApiSettings::testConnection()` | كلا الـ API (فحص اتصال منفصل لكل واحد، حالتين مستقلتين بالواجهة) |
+| `AgentDealsInspector` | كلا الـ API: `GetSubCustomerDeals` لليومي التفصيلي بالفترة (`fetchReport()`) + `GetSubCustomerActiveSubs` لـ `activeSubsCount`/`postCampaignLineCount` (`fetchActiveSubsCount()`). `preCampaignLineCount` أصبح = `agent.pre_campaign_count` المخزّن مباشرة (بدون أي API call) |
+
+**مثال حقيقي من الاختبار المباشر (2026-07-09):** وكيل بـ `pre_campaign_count=3106` (مخزَّن) أعطى `active_subs=2944` من `GetSubCustomerActiveSubs` بغض النظر عن نطاق التاريخ المُرسَل — يثبت أن الرقم لحظي كامل وليس خاصاً بالحملة، ويوضّح لماذا `new_line_count` المشتق قد يتضخّم لأصحاب الرصيد القديم الكبير.
+
+---
+
 ## 5. Project File Map & Functionality
 
 ### 5.1 Models (`app/Models/`)
@@ -520,7 +555,8 @@ match($action) {
 | `AgentsApiSettings` | 91 | `/admin/agents-api-settings` | يحفظ `agents_api_url` + `agents_api_token`. زر "استيراد الآن" يُنشئ `AgentImportLog` ويُطلق `ProcessAgentImport`. يعرض آخر استيراد (`created_count`, `skipped_count`) |
 | `DistributorsApiSettings` | 92 | `/admin/distributors-api-settings` | يحفظ `distributors_api_url` + `distributors_api_token`. زر "مزامنة الآن" يُطلق `ProcessDistributorSync`. يعرض `last_distributor_sync` + `last_distributor_sync_result` من AppSetting |
 | `NumbersApiSettings` | 93 | `/admin/numbers-api-settings` | يحفظ `numbers_api_url` + `numbers_api_token` + `daily_sync_time`. زر "مزامنة الآن" يُنشئ `DataImport(source_type='api')` ويُطلق `ProcessDataImport`. يعرض آخر import يومي |
-| `DealsApiSettings` | 95 | `/admin/deals-api-settings` | يحفظ `deals_api_url` + `deals_api_username` + `deals_api_password` + `deals_campaign_start_date` + `deals_sync_enabled` + `deals_sync_interval_minutes`. زر "مزامنة الآن" (`syncNow()`) + "اختبار الاتصال" (`testConnection()`). Hero Banner ديناميكي يُظهر حالة المزامنة (مفعّلة/معطّلة + الفترة الزمنية). Navigation Label: "مزامنة أرقام الوكلاء" |
+| `DealsApiSettings` | 95 | `/admin/deals-api-settings` | يحفظ `deals_api_url` + `deals_api_username` + `deals_api_password` + `deals_campaign_start_date` + `deals_sync_enabled` + `deals_sync_interval_minutes`. زر "مزامنة الآن" (`syncNow()`) + "اختبار الاتصال" (`testConnection()`) — **(2026-07-08) يفحص الآن apiName اثنين منفصلين**: `GetSubCustomerDeals` و`GetSubCustomerActiveSubs`، كل واحد بحالة (`connectionStatus`/`activeSubsStatus`) وخطأ (`connectionError`/`activeSubsError`) مستقلة، معروضة كسطرين منفصلين بالواجهة. Hero Banner ديناميكي يُظهر حالة المزامنة (مفعّلة/معطّلة + الفترة الزمنية). Navigation Label: "مزامنة أرقام الوكلاء" |
+| `AgentDealsInspector` | 4 (ضمن مجموعة "البيانات والمزامنة") | `/admin/agent-deals-inspector` | صفحة تشخيصية **read-only بحتة** (لا تكتب لقاعدة البيانات) — Navigation Label: "تقرير مفصل لأرقام وكيل". فورم فلترة (وكيل + من/إلى تاريخ، حد أقصى `MAX_RANGE_DAYS=120` يوماً). `fetchReport()` يستدعي `GetSubCustomerDeals` تراكمياً لكل يوم بالفترة (`Http::pool`, دفعات 20) لبناء جدول يومي تفصيلي (خطوط جديدة/تحويل/ملغى/تراكمي — يبقى المصدر الوحيد الممكن لأي بيانات مؤرَّخة تاريخياً، لأن `GetSubCustomerActiveSubs` لا يقبل نطاق تاريخ فعلي)، مع تفصيل نوع×حالة (`statusBreakdown`) وعرض الرد الخام JSON لكل يوم قابل للتوسيع. **(2026-07-09)** `preCampaignLineCount` أصبح = `agent.pre_campaign_count` المخزّن مباشرة (بدون أي API call، حُذفت `fetchCumulativeCount()` نهائياً من الكود)، و`postCampaignLineCount` أصبح = نفس قيمة `activeSubsCount` (استدعاء واحد لـ `GetSubCustomerActiveSubs` عبر `fetchActiveSubsCount()`، يُعاد استخدامه بدل استعلام منفصل) — يعني بطاقتي "من البداية حتى اليوم" و"الرقم الفعلي من المزوّد" تعرضان نفس الرقم بالضبط بالتصميم الجديد (ليس خطأ). زر "تصدير PDF" (`AgentDealsReportPdf`) يُصدّر نفس بيانات التقرير. |
 
 ---
 
@@ -815,6 +851,18 @@ Admin يفتح /admin/club-change-requests:
 ---
 
 ## 8. Technical Debt
+
+### TD-012: ⚠️ قرار عمل مقصود (ليس خللاً) — `new_line_count` قد يشمل الرصيد القديم (2026-07-09)
+
+**الوضع:** بصيغة المزامنة الجماعية الحالية (§4.5)، `new_line_count = max(0, active_subs − transfer_count)` **بدون طرح `pre_campaign_count`**. بما أن `active_subs` (من `GetSubCustomerActiveSubs`) رقم لحظي يشمل كل رصيد الوكيل (قديم + حملة)، فإن الوكلاء أصحاب `pre_campaign_count` الكبير سيظهر لهم `new_line_count`/`campaign_increase` مضخَّماً بمقدار قريب من كامل رصيدهم القديم — وليس فقط الإضافات الفعلية خلال الحملة.
+
+**هذا يتعارض مباشرة مع مبدأ TD-004 أدناه** (الذي يفترض أن `campaign_increase` يعكس إضافات الحملة الصافية فقط، بدون معاقبة أو مكافأة الوكيل بناءً على رصيده القديم).
+
+**الأثر المُثبَت كمياً (اختبار حقيقي 2026-07-09):** وكيل بـ `pre_campaign_count=1348`, `transfer_count=68` (حقيقي وموثوق) — تحت الصيغة الجديدة قفز `campaign_increase` إلى ~1433 (بدل ~85 الصحيح)، فتأهّل لنادي القمة (جائزة 70,000₪) بدل نادي التفوق (35,000₪ الصحيح) — فرق 35,000₪ لوكيل واحد فقط. هذا النمط يتكرر مع أي وكيل عنده رصيد قديم كبير + تحويل حقيقي كافٍ لأي نادٍ.
+
+**القرار:** عُرض هذا التحليل الكمي على صاحب المشروع بوضوح (بما فيه المثال أعلاه)، وأكّد صراحة المتابعة بهذه الصيغة عن قصد. **هذا ليس خللاً غير مكتشَف — هو قرار عمل موثَّق.** لا يُصلَح إلا بطلب صريح لاحق من صاحب المشروع.
+
+---
 
 ### ~~TD-002~~: ✅ مُصلَح — AgentPolicy محوّلة لـ `Authenticatable` (2026-06-19)
 
@@ -1369,4 +1417,5 @@ ProcessAgentSelfSync::handle()
 *آخر تحديث: 2026-06-20 (الإصدار 3.0 — نظام Agent Self-Sync) — إضافة §12.10 شرح كامل لنظام المزامنة الذاتية. إضافة `ProcessAgentSelfSync` job (synchronous، لا queue) في §5.2. إضافة `AgentSyncing` Livewire component في §12.4. إضافة مسار `/syncing` في §12.3 (10 مسارات). تحديث Auth Flow في §12.2 (enter → /syncing → wire:init → dashboard). تحديث Agent Model §12.7 وجدول agents §2.1 بحقل `last_self_sync_at`. تحديث AppSetting §5.8 لإضافة `ProcessAgentSelfSync` في deals_api_*. إضافة مخاطرة Self-Sync API Latency في §7.1. إصلاحان حرجان: (1) `DailySnapshot.import_id NOT NULL` → استخدام `update()` لا `updateOrCreate()` — كان يمنع إنشاء ClubChangeRequest كلياً. (2) Queue dependency → wire:init synchronous pattern بلا queue worker.*
 *آخر تحديث: 2026-06-25 (الإصدار 3.1 — تحسينات بوابة الوكيل + إصلاحات لوحة الموزع) — بوابة الوكيل: دمج "الخطوط الجديدة" كسطر تفصيلي داخل "إجمالي الزيادة". بطاقة تحفيزية ديناميكية للوكلاء خارج الأندية (6 مراحل). شريط الحالة الحي بـ 6 حالات ديناميكية بدلاً من "وضعك جيد" الثابتة. إصلاح حساب ترتيب النادي (`transfer_count` بدل `current_total`، بدون إظهار العدد الكلي). إصلاح مقياس شريط التقدم (unified scale). حذف "المخطط الزمني للأداء" من ViewAgent + حذف `daily-progress-chart.blade.php`. لوحة الموزع: إصلاح N+1 في `agents_count` (`->counts('agents')`). إصلاح badge الفارغ في RelationManager. إضافة حقل الموزع في ViewAgent مع رابط. جعل `distributor_id` اختيارياً في نموذج Agent. تحديث §3.2، §5.5، §5.7، §7.1، §8، §12.4.*
 *آخر تحديث: 2026-06-26 (الإصدار 3.2 — مساعد ذكي + إعادة تصميم Home) — إضافة `AgentAssistant` Livewire component: مساعد AI باللهجة الفلسطينية مُضمَّن كـ floating popup (FAB) في بوابة الوكيل، يتصل بـ Groq API (llama-3.3-70b-versatile)، system prompt يشمل أرقام الوكيل + مكافآت + فرص سحب + جوائز الأندية. إصلاح `wire:loading.flex` (كانت dots دائماً ظاهرة بسبب conflict مع inline `display:flex`). إعادة كتابة `welcome.blade.php` بتصميم "Sky Portal" داكن متحرك. تحديث §12.4، §12.9، §5.7.*
+*آخر تحديث: 2026-07-08 (اكتشاف `GetSubCustomerActiveSubs` + طبقة تحقق تكميلية) — إضافة §4.5 يوثّق الفرق الجوهري بين `GetSubCustomerDeals` (مصدر الحقيقة لحساب الترقية) و`GetSubCustomerActiveSubs` (API جديد اكتُشف ويُختبَر: يرجّع رقم `active_subs` إجمالي واحد "لقطة حالية"، لا يتأثر بـ `from`/`to`، ولا يفرّق `task_name` — تأكَّد بالاختبار الفعلي). قرار هندسي: **لا يُستخدم كبديل** لأنه يُسقط شرط الـ 60% تحويل (`required_transfer_count`، §4.4) لو اعتُمد في `ProcessDataImport`/`ProcessAgentSelfSync`. اقتُصر استخدامه على: (1) `DealsApiSettings::testConnection()` — يفحص الآن الـ apiName الاثنين بحالتين منفصلتين (§5.5.1)، (2) بطاقة تشخيصية جديدة "الرقم الفعلي من المزوّد" في `AgentDealsInspector` تقارنه مع `current_total` المخزّن (`fetchActiveSubsCount()`) بدون أي كتابة لقاعدة البيانات. كما وُثِّقت صفحة `AgentDealsInspector` بالكامل لأول مرة في §5.5.1 (كانت غير موثّقة). لا migration، لا تعديل على `processAgentRow()`/`AgentObserver`/`ClubChangeRequest`. تحديث §4.5 (جديد)، §5.5.1.*
 *يجب تحديثه عند أي تغيير جوهري في: ProcessDataImport، AgentObserver، بنية الـ Clubs، نظام المصادقة، Agent Portal، Console Commands المجدولة، أو SyncStatusBadge.*

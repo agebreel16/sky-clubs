@@ -171,46 +171,83 @@ class ProcessDataImport implements ShouldQueue
             $chunkNum++;
 
             $responses = Http::pool(function (Pool $pool) use ($batch, $url, $username, $password, $from, $to) {
-                return $batch->map(fn ($agent) =>
-                    $pool->as($agent->agent_id)
-                         ->withoutVerifying()
-                         ->timeout(30)
-                         ->post($url, [
-                             'username'  => $username,
-                             'password'  => $password,
-                             'apiName'   => 'GetSubCustomerDeals',
-                             'wildcards' => [$agent->agent_id, $from, $to],
-                         ])
-                )->all();
+                $requests = [];
+
+                foreach ($batch as $agent) {
+                    $requests[$agent->agent_id . '_deals'] = $pool->as($agent->agent_id . '_deals')
+                        ->withoutVerifying()
+                        ->timeout(30)
+                        ->post($url, [
+                            'username'  => $username,
+                            'password'  => $password,
+                            'apiName'   => 'GetSubCustomerDeals',
+                            'wildcards' => [$agent->agent_id, $from, $to],
+                        ]);
+
+                    $requests[$agent->agent_id . '_subs'] = $pool->as($agent->agent_id . '_subs')
+                        ->withoutVerifying()
+                        ->timeout(30)
+                        ->post($url, [
+                            'username'  => $username,
+                            'password'  => $password,
+                            'apiName'   => 'GetSubCustomerActiveSubs',
+                            'wildcards' => [$agent->agent_id, $from, $to],
+                        ]);
+                }
+
+                return $requests;
             });
 
             foreach ($batch as $agent) {
-                $response = $responses[$agent->agent_id] ?? null;
+                $dealsResponse = $responses[$agent->agent_id . '_deals'] ?? null;
+                $subsResponse  = $responses[$agent->agent_id . '_subs']  ?? null;
 
-                if (! $response || $response instanceof \Exception) {
-                    $reason = $response instanceof \Exception ? $response->getMessage() : 'لا استجابة';
+                if (! $dealsResponse || $dealsResponse instanceof \Exception) {
+                    $reason = $dealsResponse instanceof \Exception ? $dealsResponse->getMessage() : 'لا استجابة';
                     Log::warning("GetSubCustomerDeals: فشل الطلب للوكيل {$agent->agent_id}: {$reason}");
-                    $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'فشل طلب API: ' . $reason];
+                    $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'فشل طلب API (Deals): ' . $reason];
                     continue;
                 }
 
-                $body = $response->json();
-                if (($body['result'] ?? '') !== 'SUCCESS') {
-                    $reason = $body['message'] ?? $body['result'] ?? 'غير معروف';
-                    Log::warning("GetSubCustomerDeals: نتيجة غير ناجحة للوكيل {$agent->agent_id}", ['body' => $body]);
-                    $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'API أعاد: ' . $reason];
+                if (! $subsResponse || $subsResponse instanceof \Exception) {
+                    $reason = $subsResponse instanceof \Exception ? $subsResponse->getMessage() : 'لا استجابة';
+                    Log::warning("GetSubCustomerActiveSubs: فشل الطلب للوكيل {$agent->agent_id}: {$reason}");
+                    $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'فشل طلب API (ActiveSubs): ' . $reason];
                     continue;
                 }
 
-                $rows      = collect($body['data'] ?? []);
-                $newLines  = (int) $rows->where('task_name', 'new-order')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
+                $dealsBody = $dealsResponse->json();
+                if (($dealsBody['result'] ?? '') !== 'SUCCESS') {
+                    $reason = $dealsBody['message'] ?? $dealsBody['result'] ?? 'غير معروف';
+                    Log::warning("GetSubCustomerDeals: نتيجة غير ناجحة للوكيل {$agent->agent_id}", ['body' => $dealsBody]);
+                    $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'API أعاد (Deals): ' . $reason];
+                    continue;
+                }
+
+                $subsBody = $subsResponse->json();
+                if (($subsBody['result'] ?? '') !== 'SUCCESS') {
+                    $reason = $subsBody['message'] ?? $subsBody['result'] ?? 'غير معروف';
+                    Log::warning("GetSubCustomerActiveSubs: نتيجة غير ناجحة للوكيل {$agent->agent_id}", ['body' => $subsBody]);
+                    $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'API أعاد (ActiveSubs): ' . $reason];
+                    continue;
+                }
+
+                // transfer_count: من GetSubCustomerDeals — مصدر موثوق لهذا الحقل فقط
+                $rows      = collect($dealsBody['data'] ?? []);
                 $transfers = (int) $rows->where('task_name', 'number-portability')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
+
+                // active_subs: لقطة لحظية كاملة (قديم + حملة) من GetSubCustomerActiveSubs — لا تتأثر بـ from/to
+                $subsRow    = collect($subsBody['data'] ?? [])->first();
+                $activeSubs = $subsRow !== null ? (int) ($subsRow['active_subs'] ?? 0) : 0;
+
+                // new_line_count مشتق: active_subs ناقص التحويل (بدون طرح pre_campaign_count)
+                $newLines = max(0, $activeSubs - $transfers);
 
                 $data[] = [
                     'agent_id'       => $agent->agent_id,
                     'new_line_count' => $newLines,
                     'transfer_count' => $transfers,
-                    'current_total'  => $agent->pre_campaign_count + $newLines + $transfers,
+                    'current_total'  => $activeSubs,
                 ];
             }
 

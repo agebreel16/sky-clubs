@@ -50,7 +50,7 @@
             ? $this->preCampaignLineCount + $this->postCampaignLineCount
             : null;
     @endphp
-    <div style="margin-top:20px; display:grid; grid-template-columns:repeat(3,1fr); gap:12px;">
+    <div style="margin-top:20px; display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
         <div style="background:{{ $this->preCampaignFailed ? '#fef2f2' : '#fffbeb' }};border:1px solid {{ $this->preCampaignFailed ? '#fecaca' : '#fde68a' }};border-radius:12px;padding:14px 16px;">
             <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:{{ $this->preCampaignFailed ? '#991b1b' : '#92400e' }};">عدد الخطوط حتى {{ $this->campaignStartLabel }}</p>
             <p style="margin:0;font-size:20px;font-weight:800;color:{{ $this->preCampaignFailed ? '#dc2626' : '#b45309' }};">
@@ -68,6 +68,26 @@
             <p style="margin:0;font-size:20px;font-weight:800;color:#15803d;">
                 {{ $lifetimeTotal !== null ? number_format($lifetimeTotal) : '—' }}
             </p>
+        </div>
+        @php
+            $activeSubsDiff = (! $this->activeSubsFailed && $this->reportAgentCurrentTotal !== null)
+                ? $this->activeSubsCount - $this->reportAgentCurrentTotal
+                : null;
+        @endphp
+        <div style="background:{{ $this->activeSubsFailed ? '#fef2f2' : ($activeSubsDiff === 0 ? '#f0fdf4' : '#fff7ed') }};border:1px solid {{ $this->activeSubsFailed ? '#fecaca' : ($activeSubsDiff === 0 ? '#bbf7d0' : '#fed7aa') }};border-radius:12px;padding:14px 16px;">
+            <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:{{ $this->activeSubsFailed ? '#991b1b' : ($activeSubsDiff === 0 ? '#166534' : '#9a3412') }};">الرقم الفعلي من المزوّد (Active Subs)</p>
+            <p style="margin:0;font-size:20px;font-weight:800;color:{{ $this->activeSubsFailed ? '#dc2626' : ($activeSubsDiff === 0 ? '#15803d' : '#c2410c') }};">
+                {{ $this->activeSubsFailed ? 'تعذر الجلب' : number_format($this->activeSubsCount) }}
+            </p>
+            @if(! $this->activeSubsFailed && $activeSubsDiff !== null)
+                <p style="margin:4px 0 0;font-size:11px;color:{{ $activeSubsDiff === 0 ? '#16a34a' : '#c2410c' }};font-weight:600;">
+                    @if($activeSubsDiff === 0)
+                        ✓ مطابق للمخزّن ({{ number_format($this->reportAgentCurrentTotal) }})
+                    @else
+                        ⚠ فرق {{ $activeSubsDiff > 0 ? '+' : '' }}{{ number_format($activeSubsDiff) }} عن المخزّن ({{ number_format($this->reportAgentCurrentTotal) }})
+                    @endif
+                </p>
+            @endif
         </div>
     </div>
 
@@ -140,7 +160,10 @@
     </div>
 
     {{-- ── Table ── --}}
-    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; margin-top:16px;">
+    <p style="margin:0 0 8px; font-size:11.5px; color:#9ca3af;">
+        ⓘ عمود "خطوط جديدة" اليومي مصدره GetSubCustomerDeals لكل يوم على حدة (تقديري تاريخياً) — لأن GetSubCustomerActiveSubs لا يقبل نطاق تاريخ فعلي (يرجّع دائماً اللقطة الحالية بغض النظر عن التاريخ المطلوب).
+    </p>
+    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; margin-top:0;">
         <table style="width:100%; border-collapse:collapse; font-size:13px;">
             <thead>
                 <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
