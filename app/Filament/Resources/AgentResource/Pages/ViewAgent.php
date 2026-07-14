@@ -4,6 +4,8 @@ namespace App\Filament\Resources\AgentResource\Pages;
 
 use App\Filament\Resources\AgentResource;
 use App\Models\Agent;
+use App\Models\AppSetting;
+use App\Support\DealsApiCalculator;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -15,6 +17,8 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Http;
 
 class ViewAgent extends ViewRecord
 {
@@ -43,6 +47,22 @@ class ViewAgent extends ViewRecord
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('إغلاق'),
 
+            // فحص تشخيصي: يعرض الرد الخام الكامل من كلا الـ API لهذا الوكيل تحديداً،
+            // بنفس معاملات from/to التي تستخدمها مهام المزامنة الفعلية — للتأكد يدوياً
+            // أن الاستجابة لا تحتوي مشكلة، بدون أي تلخيص أو اشتقاق للأرقام.
+            Action::make('inspect_api_response')
+                ->label('API TEST')
+                ->icon('heroicon-o-code-bracket-square')
+                ->color('gray')
+                ->modalWidth('5xl')
+                ->modalHeading('API RESPONSE')
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('إغلاق')
+                ->modalContent(fn (Agent $record) => view(
+                    'filament.agent.api-inspector-modal',
+                    $this->fetchRawApiResponses($record)
+                )),
+
             // Invalidate old token and generate a new one
             Action::make('regenerate_portal_link')
                 ->label('تجديد الرابط')
@@ -55,6 +75,131 @@ class ViewAgent extends ViewRecord
                     $record->generatePortalToken();
                     Notification::make()->title('تم تجديد الرابط بنجاح')->success()->send();
                 }),
+        ];
+    }
+
+    /**
+     * يستدعي GetSubCustomerDeals وGetSubCustomerActiveSubs لهذا الوكيل تحديداً (نفس
+     * from/to المستخدمة فعلياً في ProcessDataImport/ProcessAgentSelfSync)، ويُرجع
+     * الرد الخام الكامل لكل منهما لعرضه في مودال تشخيصي — بدون أي تلخيص أو اشتقاق.
+     */
+    private function fetchRawApiResponses(Agent $record): array
+    {
+        $url      = AppSetting::get('deals_api_url');
+        $username = AppSetting::get('deals_api_username');
+        $password = AppSetting::get('deals_api_password');
+        $from     = AppSetting::get('deals_campaign_start_date', '2026-05-17');
+        $to       = today()->format('Y-m-d');
+
+        $context = ['agentId' => $record->agent_id, 'from' => $from, 'to' => $to];
+
+        if (! $url || ! $username) {
+            return [
+                'configured' => false,
+                'context'    => $context,
+                'results'    => [],
+            ];
+        }
+
+        $responses = Http::pool(fn (Pool $pool) => [
+            'GetSubCustomerDeals' => $pool->as('GetSubCustomerDeals')
+                ->withoutVerifying()
+                ->timeout(15)
+                ->post($url, DealsApiCalculator::buildPayload($username, $password, 'GetSubCustomerDeals', $record->agent_id, $from, $to)),
+            'GetSubCustomerActiveSubs' => $pool->as('GetSubCustomerActiveSubs')
+                ->withoutVerifying()
+                ->timeout(15)
+                ->post($url, DealsApiCalculator::buildPayload($username, $password, 'GetSubCustomerActiveSubs', $record->agent_id, $from, $to)),
+        ]);
+
+        $results = [];
+
+        foreach (['GetSubCustomerDeals', 'GetSubCustomerActiveSubs'] as $apiName) {
+            $response = $responses[$apiName] ?? null;
+
+            if (! $response || $response instanceof \Exception) {
+                $results[$apiName] = [
+                    'ok'     => false,
+                    'error'  => $response instanceof \Exception ? $response->getMessage() : 'لا استجابة من الـ API',
+                    'status' => null,
+                    'raw'    => null,
+                ];
+                continue;
+            }
+
+            $body = $response->json();
+
+            $results[$apiName] = [
+                'ok'     => true,
+                'error'  => null,
+                'status' => $response->status(),
+                'raw'    => $body !== null
+                    ? json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    : $response->body(),
+                'isJson' => $body !== null,
+            ];
+        }
+
+        return [
+            'configured' => true,
+            'context'    => $context,
+            'results'    => $results,
+        ];
+    }
+
+    /**
+     * بطاقات قسم "الأرقام والإحصائيات" — تُعرَض عبر resources/views/filament/agent/stats-grid.blade.php
+     * بنفس نظام sc-stat-card المستخدَم في campaign-stats-overview.blade.php (متوافق تلقائياً مع الوضع الداكن/الفاتح).
+     *
+     * @return array<int, array{value: int|string, label: string, color: string, icon: string}>
+     */
+    private function statsTiles(Agent $record): array
+    {
+        $tiles = [
+
+            [
+                'value' => number_format($record->pre_campaign_count),
+                'label' => 'الخطوط قبل الحملة',
+                'color' => 'var(--sc-text3)',
+                'icon'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>',
+            ],
+            [
+                'value' => number_format($record->current_total),
+                'label' => 'الإجمالي حتى الآن',
+                'color' => 'var(--sc-accent)',
+                'icon'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+            ],
+        ];
+
+        return $tiles;
+    }
+
+    /**
+     * صف المعادلة المميّز: الخطوط داخل الحملة = خطوط التحويل + الخطوط الجديدة.
+     * يُعرَض كسطر واحد مستقل فوق شبكة البطاقات لإبراز هذه العلاقة الحسابية بصرياً.
+     *
+     * @return array{total: array{value: string, label: string, color: string}, parts: array<int, array{value: string, label: string, color: string}>}
+     */
+    private function campaignEquation(Agent $record): array
+    {
+        return [
+            'total' => [
+                'value' => number_format($record->campaign_increase),
+                'label' => 'الخطوط داخل الحملة',
+                'color' => 'var(--sc-green)',
+            ],
+            'parts' => [
+                [
+                    'value' => number_format($record->transfer_count),
+                    'label' => 'خطوط التحويل',
+                    'color' => 'var(--sc-purple)',
+                ],
+                [
+                    'value' => number_format($record->new_line_count),
+                    'label' => 'الخطوط الجديدة',
+                    'color' => 'var(--sc-gold)',
+                ],
+            ],
         ];
     }
 
@@ -164,78 +309,14 @@ class ViewAgent extends ViewRecord
             Section::make('الأرقام والإحصائيات')
                 ->icon('heroicon-o-chart-bar-square')
                 ->iconColor('info')
-                ->columns(4)
                 ->schema([
-                    TextEntry::make('baseline_count')
-                        ->label('الأساس المجمّد')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->badge()
-                        ->color('gray'),
-
-                    TextEntry::make('pre_campaign_count')
-                        ->label('الخطوط القديمة المتبقية')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->badge()
-                        ->color('gray')
-                        ->helperText(fn (Agent $record) => 'من أصل ' . $record->baseline_count . ' خط'),
-
-                    TextEntry::make('current_total')
-                        ->label('الإجمالي الحالي')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->badge()
-                        ->color('info'),
-
-                    TextEntry::make('campaign_increase_calc')
-                        ->label('الزيادة في الحملة')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->getStateUsing(fn (Agent $record) => $record->transfer_count + $record->new_line_count)
-                        ->badge()
-                        ->color('success'),
-
-                    TextEntry::make('transfer_count')
-                        ->label('التحويلات')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->badge()
-                        ->color('primary'),
-
-                    TextEntry::make('new_line_count')
-                        ->label('الخطوط الجديدة')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->badge()
-                        ->color('primary'),
-
-                    TextEntry::make('transfer_pct_calc')
-                        ->label('نسبة التحويل')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->getStateUsing(function (Agent $record): string {
-                            if (!$record->club) return '—';
-                            $req = (int) $record->club->required_increase;
-                            if ($req === 0) return '0%';
-                            return round(($record->transfer_count / $req) * 100, 1) . '%';
-                        })
-                        ->badge()
-                        ->color(function (Agent $record): string {
-                            if (!$record->club) return 'gray';
-                            $req = (int) $record->club->required_increase;
-                            if ($req === 0) return 'gray';
-                            return ($record->transfer_count / $req) * 100 >= 60 ? 'success' : 'danger';
-                        }),
-
-                    TextEntry::make('baseline_loss_calc')
-                        ->label('الخطوط القديمة المفقودة')
-                        ->size('lg')
-                        ->weight('bold')
-                        ->getStateUsing(fn (Agent $record) => $record->baseline_count - $record->pre_campaign_count)
-                        ->suffix(' خط')
-                        ->badge()
-                        ->color(fn (Agent $record) => ($record->baseline_count - $record->pre_campaign_count) > 0 ? 'danger' : 'success'),
+                    ViewEntry::make('stats')
+                        ->view('filament.agent.stats-grid')
+                        ->viewData(fn (Agent $record) => [
+                            'tiles'    => $this->statsTiles($record),
+                            'equation' => $this->campaignEquation($record),
+                        ])
+                        ->columnSpanFull(),
                 ]),
 
             // ── Row 3: Violator Warning ───────────────────────────────────────

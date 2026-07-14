@@ -114,9 +114,9 @@ class EditAgent extends EditRecord
                     Placeholder::make('campaign_increase_preview')
                         ->label('الزيادة في الحملة')
                         ->content(function ($get): string {
-                            $transfer = (int) $get('transfer_count');
-                            $newLine  = (int) $get('new_line_count');
-                            return ($transfer + $newLine) . ' خط';
+                            $currentTotal = (int) $get('current_total');
+                            $baseline     = (int) $get('baseline_count');
+                            return max(0, $currentTotal - $baseline) . ' خط';
                         }),
                 ]),
 

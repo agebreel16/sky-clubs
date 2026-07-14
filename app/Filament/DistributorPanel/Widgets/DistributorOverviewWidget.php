@@ -26,7 +26,7 @@ class DistributorOverviewWidget extends BaseWidget
         $firstArrivals = Agent::where('distributor_id', $distributorId)->where('is_first_arrival', true)->count();
 
         $totalIncrease = Agent::where('distributor_id', $distributorId)
-            ->selectRaw('SUM(transfer_count + new_line_count) as total_increase')
+            ->selectRaw('SUM(GREATEST(0, current_total - baseline_count)) as total_increase')
             ->value('total_increase') ?? 0;
 
         $totalRewards = DB::table('rewards')

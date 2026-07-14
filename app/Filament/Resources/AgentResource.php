@@ -73,7 +73,12 @@ class AgentResource extends Resource
                         ->integer()
                         ->minValue(1)
                         ->disabledOn('edit')
-                        ->dehydratedWhenHidden(),
+                        ->dehydratedWhenHidden()
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, Get $get, string $operation) {
+                            if ($operation !== 'create') return;
+                            AgentResource::autoAssignClub($set, $get);
+                        }),
 
                     TextInput::make('pre_campaign_count')
                         ->label('الأرقام القديمة')
@@ -140,7 +145,9 @@ class AgentResource extends Resource
                         ->nullable()
                         ->placeholder('خارج الأندية')
                         ->disabled(fn (string $operation): bool => $operation === 'create')
-                        ->dehydrated(),
+                        // عند الإنشاء هذا الحقل معطّل ومجرد معاينة حية (autoAssignClub) —
+                        // لا يجب حفظ قيمته فعلياً؛ الوكيل يبدأ دائماً خارج الأندية.
+                        ->dehydrated(fn (string $operation): bool => $operation !== 'create'),
 
                     DateTimePicker::make('entry_date')
                         ->label('تاريخ الدخول للنادي')
@@ -188,7 +195,7 @@ class AgentResource extends Resource
 
     public static function autoAssignClub(Set $set, Get $get): void
     {
-        $increase      = (int) $get('transfer_count') + (int) $get('new_line_count');
+        $increase      = (int) $get('current_total') - (int) $get('baseline_count');
         $transferCount = (int) $get('transfer_count');
         $club = Club::where('is_active', true)
             ->where('required_increase', '<=', max(0, $increase))
@@ -278,7 +285,7 @@ class AgentResource extends Resource
                 // ── زيادة الحملة — growth badge أخضر ──────────────────────
                 TextColumn::make('campaign_increase_display')
                     ->label('الزيادة')
-                    ->getStateUsing(fn (Agent $record): int => $record->transfer_count + $record->new_line_count)
+                    ->getStateUsing(fn (Agent $record): int => $record->campaign_increase)
                     ->formatStateUsing(fn ($state): string => "<span class=\"sc-growth\">+{$state}</span>")
                     ->html()
                     ->sortable(false),

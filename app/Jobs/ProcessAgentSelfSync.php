@@ -7,9 +7,11 @@ use App\Models\AppSetting;
 use App\Models\Club;
 use App\Models\ClubChangeRequest;
 use App\Models\DailySnapshot;
+use App\Support\DealsApiCalculator;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,7 @@ class ProcessAgentSelfSync implements ShouldQueue
         $username = AppSetting::get('deals_api_username');
         $password = AppSetting::get('deals_api_password');
         $from     = AppSetting::get('deals_campaign_start_date', '2026-05-17');
+        $to       = today()->format('Y-m-d');
 
         if (! $url || ! $username) {
             $this->updateSyncTime();
@@ -43,35 +46,55 @@ class ProcessAgentSelfSync implements ShouldQueue
         }
 
         try {
-            $response = Http::withoutVerifying()
-                ->timeout(15)
-                ->post($url, [
-                    'username'  => $username,
-                    'password'  => $password,
-                    'apiName'   => 'GetSubCustomerDeals',
-                    'wildcards' => [$this->agent->agent_id, $from, today()->format('Y-m-d')],
-                ]);
+            $agentId = $this->agent->agent_id;
 
-            $body = $response->json();
+            $responses = Http::pool(fn (Pool $pool) => [
+                'deals' => $pool->as('deals')
+                    ->withoutVerifying()
+                    ->timeout(15)
+                    ->post($url, DealsApiCalculator::buildPayload($username, $password, 'GetSubCustomerDeals', $agentId, $from, $to)),
+                'subs' => $pool->as('subs')
+                    ->withoutVerifying()
+                    ->timeout(15)
+                    ->post($url, DealsApiCalculator::buildPayload($username, $password, 'GetSubCustomerActiveSubs', $agentId, $from, $to)),
+            ]);
 
-            if (($body['result'] ?? '') !== 'SUCCESS') {
-                Log::warning("AgentSelfSync: API لم يُرجع SUCCESS للوكيل {$this->agent->agent_id}");
+            $dealsResponse = $responses['deals'];
+            $subsResponse  = $responses['subs'];
+
+            if (! $dealsResponse || $dealsResponse instanceof \Exception) {
+                Log::warning("AgentSelfSync: فشل طلب GetSubCustomerDeals للوكيل {$agentId}");
                 $this->updateSyncTime();
                 return;
             }
 
-            $rows      = collect($body['data'] ?? []);
-            $newLines  = (int) $rows->where('task_name', 'new-order')
-                ->where('status', 'Activated')
-                ->sum(fn ($r) => (int) $r['count']);
-            $transfers = (int) $rows->where('task_name', 'number-portability')
-                ->where('status', 'Activated')
-                ->sum(fn ($r) => (int) $r['count']);
+            if (! $subsResponse || $subsResponse instanceof \Exception) {
+                Log::warning("AgentSelfSync: فشل طلب GetSubCustomerActiveSubs للوكيل {$agentId}");
+                $this->updateSyncTime();
+                return;
+            }
+
+            $dealsBody = $dealsResponse->json();
+            if (! DealsApiCalculator::isSuccess($dealsBody)) {
+                Log::warning("AgentSelfSync: GetSubCustomerDeals لم يُرجع SUCCESS للوكيل {$agentId}");
+                $this->updateSyncTime();
+                return;
+            }
+
+            $subsBody = $subsResponse->json();
+            if (! DealsApiCalculator::isSuccess($subsBody)) {
+                Log::warning("AgentSelfSync: GetSubCustomerActiveSubs لم يُرجع SUCCESS للوكيل {$agentId}");
+                $this->updateSyncTime();
+                return;
+            }
+
+            $transfers  = DealsApiCalculator::extractTransferCount($dealsBody);
+            $activeSubs = DealsApiCalculator::extractActiveSubs($subsBody);
 
             $clubs = Club::where('is_active', true)->orderBy('club_order')->get();
 
-            Agent::withoutEvents(function () use ($newLines, $transfers, $clubs) {
-                $this->processRow($newLines, $transfers, $clubs);
+            Agent::withoutEvents(function () use ($activeSubs, $transfers, $clubs) {
+                $this->processRow($activeSubs, $transfers, $clubs);
             });
 
         } catch (\Exception $e) {
@@ -81,34 +104,31 @@ class ProcessAgentSelfSync implements ShouldQueue
         $this->updateSyncTime();
     }
 
-    private function processRow(int $newLines, int $transfers, $clubs): void
+    private function processRow(int $activeSubs, int $transfers, $clubs): void
     {
         $agent = $this->agent->fresh();
         if (! $agent) return;
 
-        $importedTotal = max(
-            $agent->pre_campaign_count,
-            $agent->pre_campaign_count + $newLines + $transfers
-        );
+        $totals = DealsApiCalculator::computeTotals($activeSubs, $transfers, (int) $agent->pre_campaign_count, (int) $agent->baseline_count);
 
         $agent->update([
-            'transfer_count' => $transfers,
-            'new_line_count' => $newLines,
-            'current_total'  => $importedTotal,
+            'transfer_count' => $totals['transfer_count'],
+            'new_line_count' => $totals['new_line_count'],
+            'current_total'  => $totals['current_total'],
         ]);
 
         // تحديث snapshot اليوم إن وُجد من import سابق — لا ننشئ snapshot جديداً لأن import_id NOT NULL
         DailySnapshot::where('data_date', today())
             ->where('agent_id', $agent->agent_id)
             ->update([
-                'current_total'   => $importedTotal,
-                'transfer_count'  => $transfers,
-                'new_line_count'  => $newLines,
+                'current_total'   => $totals['current_total'],
+                'transfer_count'  => $totals['transfer_count'],
+                'new_line_count'  => $totals['new_line_count'],
                 'club_id_at_date' => $agent->current_club_id,
             ]);
 
         $agent->refresh();
-        $campaignIncrease = $agent->transfer_count + $agent->new_line_count;
+        $campaignIncrease = $agent->campaign_increase;
 
         $bestClub = null;
         foreach ($clubs as $club) {
@@ -122,9 +142,9 @@ class ProcessAgentSelfSync implements ShouldQueue
         $currentOrder = $currentClub ? (int) $currentClub->club_order : 0;
         $newOrder     = $bestClub    ? (int) $bestClub->club_order    : 0;
 
-        $existingPending = ClubChangeRequest::where('agent_id', $agent->agent_id)
-            ->where('status', 'pending')
-            ->first();
+        $changeType = $newOrder > $currentOrder
+            ? 'promotion'
+            : (($currentClub && $newOrder < $currentOrder) ? 'demotion' : null);
 
         $snapshot = [
             'campaign_increase' => $campaignIncrease,
@@ -136,62 +156,18 @@ class ProcessAgentSelfSync implements ShouldQueue
                 : 0,
         ];
 
-        if ($newOrder > $currentOrder) {
-            if ($existingPending) {
-                if ($existingPending->change_type === 'promotion'
-                    && $existingPending->to_club_id === $bestClub->club_id) {
-                    $existingPending->update(['agent_stats_snapshot' => $snapshot]);
-                } else {
-                    $existingPending->update(['status' => 'auto_cancelled']);
-                    ClubChangeRequest::create([
-                        'agent_id'            => $agent->agent_id,
-                        'import_id'           => null,
-                        'from_club_id'        => $agent->current_club_id,
-                        'to_club_id'          => $bestClub->club_id,
-                        'change_type'         => 'promotion',
-                        'agent_stats_snapshot' => $snapshot,
-                        'status'              => 'pending',
-                    ]);
-                }
-            } else {
-                ClubChangeRequest::create([
-                    'agent_id'            => $agent->agent_id,
-                    'import_id'           => null,
-                    'from_club_id'        => $agent->current_club_id,
-                    'to_club_id'          => $bestClub->club_id,
-                    'change_type'         => 'promotion',
-                    'agent_stats_snapshot' => $snapshot,
-                    'status'              => 'pending',
-                ]);
-            }
-        } elseif ($currentClub && $newOrder < $currentOrder) {
-            if ($existingPending) {
-                if ($existingPending->change_type === 'demotion') {
-                    $existingPending->update(['agent_stats_snapshot' => $snapshot]);
-                } else {
-                    $existingPending->update(['status' => 'auto_cancelled']);
-                    ClubChangeRequest::create([
-                        'agent_id'            => $agent->agent_id,
-                        'import_id'           => null,
-                        'from_club_id'        => $currentClub->club_id,
-                        'to_club_id'          => $bestClub?->club_id,
-                        'change_type'         => 'demotion',
-                        'agent_stats_snapshot' => $snapshot,
-                        'status'              => 'pending',
-                    ]);
-                }
-            } else {
-                ClubChangeRequest::create([
-                    'agent_id'            => $agent->agent_id,
-                    'import_id'           => null,
-                    'from_club_id'        => $currentClub->club_id,
-                    'to_club_id'          => $bestClub?->club_id,
-                    'change_type'         => 'demotion',
-                    'agent_stats_snapshot' => $snapshot,
-                    'status'              => 'pending',
-                ]);
-            }
-        }
+        // مصالحة/إنشاء طلب تغيير النادي — تتعافى تلقائياً من تصادم التزامن (استيراد
+        // الأدمن الجماعي قد يعالج نفس الوكيل في نفس اللحظة عبر عملية PHP منفصلة).
+        // ملاحظة: هذا يُلغي أيضاً أي طلب معلّق شاذ عندما لا يعد الوكيل مؤهلاً لأي
+        // تغيير ($changeType === null)، بما يطابق سلوك ProcessDataImport.
+        ClubChangeRequest::syncPendingRequest(
+            $agent,
+            $changeType,
+            $changeType === 'promotion' ? $agent->current_club_id : $currentClub?->club_id,
+            $changeType === 'promotion' ? $bestClub->club_id      : $bestClub?->club_id,
+            $snapshot,
+            null
+        );
     }
 
     private function updateSyncTime(): void

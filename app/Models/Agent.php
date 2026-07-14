@@ -111,7 +111,7 @@ class Agent extends Model
 
     public function getCampaignIncreaseAttribute(): int
     {
-        return $this->transfer_count + $this->new_line_count;
+        return max(0, $this->current_total - $this->baseline_count);
     }
 
     public function getTransferPercentageAttribute(): float

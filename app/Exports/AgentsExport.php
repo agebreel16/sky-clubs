@@ -45,7 +45,7 @@ class AgentsExport
 
         $row = 2;
         foreach ($agents as $agent) {
-            $campaignLines    = $agent->new_line_count + $agent->transfer_count;
+            $campaignLines    = $agent->campaign_increase;
             $requiredIncrease = (int) ($agent->club?->required_increase ?? 0);
             if ($requiredIncrease > 0) {
                 $transferPct = round($agent->transfer_count / $requiredIncrease * 100, 2) . '%';

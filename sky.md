@@ -457,15 +457,15 @@ new_line_count  = max(0, active_subs − transfer_count)   ← بدون طرح p
 pre_campaign_count / baseline_count = بدون تغيير — من إكسل الحملة فقط، لا تلمسهم هذه المزامنة إطلاقاً
 ```
 
-**⚠️ قرار عمل مقصود (وليس خللاً) — انظر أيضاً §8 "قرار عمل: new_line_count يشمل الرصيد القديم":** بما أن `active_subs` يشمل كل رصيد الوكيل القديم، فـ `new_line_count` المشتق لأصحاب `pre_campaign_count` الكبير سيكون مضخَّماً بمقدار قريب من رصيدهم القديم بالكامل — وهذا تعارض معروف مع مبدأ TD-004 (الذي يفترض `campaign_increase` = إضافات الحملة الصافية فقط). تم فحص الأثر كمياً وعُرض على صاحب المشروع (مثال: وكيل تأهّل لنادي القمة 70,000₪ بدل نادي التفوق 35,000₪ الصحيح) — وتمت الموافقة الصريحة على المتابعة بهذه الصيغة بتاريخ 2026-07-09.
+**⚠️ قرار عمل سابق (TD-012)، تجاوزته TD-013 — انظر §8:** بما أن `active_subs` يشمل كل رصيد الوكيل القديم، فـ `new_line_count` المشتق لأصحاب `pre_campaign_count` الكبير يكون مضخَّماً بمقدار قريب من رصيدهم القديم بالكامل. كان هذا يتعارض مع مبدأ TD-004 (`campaign_increase = transfer_count + new_line_count`) لأنه ينعكس مباشرة على "الزيادة" وتأهيل الأندية. **بتاريخ 2026-07-13 (TD-013)** تغيّرت صيغة `campaign_increase` لتصبح `max(0, current_total - baseline_count)` — لم تعد تعتمد على `new_line_count`/`transfer_count` إطلاقاً، فانتهى أثر هذا التضخّم على "الزيادة" وتأهيل الأندية. `new_line_count` يبقى كما هو (نفس الاشتقاق أعلاه) لكن كحقل عرض معلوماتي فقط ("الخطوط الجديدة").
 
-**استثناء متعمَّد — `ProcessAgentSelfSync` لم يتحدّث:** مزامنة الوكيل الذاتية من بوابته (زر "مزامنة الآن" الشخصي) **لا تزال تعتمد فقط على `GetSubCustomerDeals`** لكلا الحقلين (`new-order` لـ `new_line_count`، `number-portability` لـ `transfer_count`) — بقرار صريح من صاحب المشروع، ما يعني أن أرقام الوكيل قد تختلف مؤقتاً بين المزامنة الجماعية والمزامنة الذاتية لنفس الوكيل حتى تُشغَّل المزامنة الجماعية التالية.
+**~~استثناء متعمَّد — `ProcessAgentSelfSync` لم يتحدّث~~ (مُصلَح 2026-07-13 — انظر TD-014):** كانت مزامنة الوكيل الذاتية من بوابته (زر "مزامنة الآن" الشخصي) تعتمد فقط على `GetSubCustomerDeals` (بقرار سابق من صاحب المشروع، يقبل اختلافاً مؤقتاً بالأرقام بين المزامنتين). بعد أن أُبلِغ عن هذا الاختلاف كخلل ملحوظ من المستخدمين، أُلغي القرار وأصبحت المزامنة الذاتية تستخدم نفس صيغة المزامنة الجماعية بالكامل (كلا الـ API).
 
 **نقاط الاستخدام:**
 | الملف | يستخدم |
 |---|---|
 | `ProcessDataImport::readDealsApi()` | كلا الـ API (الصيغة أعلاه) |
-| `ProcessAgentSelfSync` | `GetSubCustomerDeals` فقط (لم يتحدّث) |
+| `ProcessAgentSelfSync` | كلا الـ API — نفس الصيغة تماماً (مُصلَح، TD-014) عبر `App\Support\DealsApiCalculator` المشترك |
 | `DealsApiSettings::testConnection()` | كلا الـ API (فحص اتصال منفصل لكل واحد، حالتين مستقلتين بالواجهة) |
 | `AgentDealsInspector` | كلا الـ API: `GetSubCustomerDeals` لليومي التفصيلي بالفترة (`fetchReport()`) + `GetSubCustomerActiveSubs` لـ `activeSubsCount`/`postCampaignLineCount` (`fetchActiveSubsCount()`). `preCampaignLineCount` أصبح = `agent.pre_campaign_count` المخزّن مباشرة (بدون أي API call) |
 
@@ -852,6 +852,37 @@ Admin يفتح /admin/club-change-requests:
 
 ## 8. Technical Debt
 
+### ~~TD-015~~: ✅ مُصلَح — إغلاق TD-012 بطلب صريح: new_line_count يُشتَق من campaign_increase (2026-07-13)
+
+**الوضع السابق:** `new_line_count = max(0, active_subs - transfer_count)` (موثَّق كـ TD-012 كـ"قرار عمل مقصود"). النتيجة: `new_line_count + transfer_count` كان يساوي `current_total` (رقماً لحظياً يشمل كل الرصيد القديم) وليس `campaign_increase` (الزيادة الصافية للحملة) — تناقض لاحظه المستخدم مباشرة على صفحة عرض الوكيل.
+
+**⚠️ هذا يُلغي صراحة قرار TD-012 السابق** بطلب لاحق من صاحب المشروع بعد رؤية التناقض على صفحة وكيل حقيقية.
+
+**الإصلاح:** `App\Support\DealsApiCalculator::computeTotals()` أصبح يستقبل `baselineCount` أيضاً، ويحسب:
+```
+campaign_increase = max(0, current_total - baseline_count)
+new_line_count     = max(0, campaign_increase - transfer_count)
+```
+بحيث `new_line_count + transfer_count = campaign_increase` دائماً. عُدِّل مصدر الحقيقة الواحد فقط، فانعكس تلقائياً على `ProcessDataImport::readDealsApi()` و`ProcessAgentSelfSync` (كلاهما يستدعي نفس الدالة). **تصحيح رجعي** لكل الوكلاء المخزَّنين عبر أمر جديد `php artisan app:recompute-new-line-count` (يعيد الحساب من `current_total`/`baseline_count`/`transfer_count` المخزَّنة، بدون أي استدعاء API).
+
+**لا تأثير على الترقية/التهبيط:** `campaign_increase` (المستخدم فعلياً في شروط الترقية، TD-013) لا يعتمد على `new_line_count` إطلاقاً — هذا الحقل معلوماتي فقط.
+
+**تعديلات إضافية على صفحة عرض الوكيل (`ViewAgent.php`):** إعادة تسمية عدة حقول في قسم "الأرقام والإحصائيات" لتوضيح المعنى (مثلاً "الأساس المجمّد" → "إجمالي الخطوط قبل الحملة")، حذف "الخطوط القديمة المفقودة"، واستبدال "نسبة التحويل" بـ"عدد خطوط التحويل المطلوبة للنادي القادم" (يُخفى تلقائياً إذا كان الوكيل بالفعل في أعلى نادٍ).
+
+---
+
+### ~~TD-014~~: ✅ مُصلَح — توحيد صيغة المزامنة الذاتية مع المزامنة الجماعية (2026-07-13)
+
+**الوضع السابق:** `ProcessAgentSelfSync` كان يستدعي `GetSubCustomerDeals` فقط، ويحسب `current_total` بجمع تراكمي (`pre_campaign_count + new_line_count + transfer_count`) بدل قراءة `active_subs` كمرجع حي مثل `ProcessDataImport::readDealsApi()`. كان هذا **قراراً مقصوداً وموثَّقاً** (راجع §4.5 أعلاه، النسخة السابقة من هذا القسم) بقبول اختلاف مؤقت بالأرقام بين المزامنتين.
+
+**⚠️ ملاحظة مهمة لصاحب المشروع:** هذا الإصلاح **يُلغي** ذلك القرار السابق صراحة، بناءً على طلب لاحق أُبلِغ فيه عن هذا الاختلاف كخلل ملحوظ. إذا كان القرار الأصلي لا يزال مرغوباً لسبب لم يُذكر في هذا الطلب، يجب التراجع عن هذا التغيير تحديداً.
+
+**الإصلاح:** استُخرجت صيغة الحساب المشتركة (`extractTransferCount`, `extractActiveSubs`, `computeTotals`) إلى `App\Support\DealsApiCalculator` (كلاس جديد، دوال static فقط)، ويستخدمها كلا المسارين الآن. `ProcessAgentSelfSync` أصبح يستدعي `GetSubCustomerActiveSubs` أيضاً (عبر `Http::pool` بالتوازي مع `GetSubCustomerDeals` — يعمل هذا الـ Job بشكل متزامن داخل طلب HTTP حقيقي فلا يجوز مضاعفة زمن الانتظار)، ويحسب `current_total`/`new_line_count` بنفس صيغة المزامنة الجماعية بالضبط. عند فشل أي من الاستدعاءين: لا تُحدَّث الأرقام هذه الدورة (بدون fallback للصيغة القديمة)، مطابقاً لسلوك المزامنة الجماعية عند فشل API لأي وكيل.
+
+**اختبارات جديدة:** `tests/Unit/DealsApiCalculatorTest.php`، `tests/Feature/ProcessAgentSelfSyncTest.php` (يتضمن اختباراً مباشراً يُشغّل نفس بيانات API الوهمية عبر المسارين ويتحقق من تطابق النتيجة تماماً).
+
+---
+
 ### TD-012: ⚠️ قرار عمل مقصود (ليس خللاً) — `new_line_count` قد يشمل الرصيد القديم (2026-07-09)
 
 **الوضع:** بصيغة المزامنة الجماعية الحالية (§4.5)، `new_line_count = max(0, active_subs − transfer_count)` **بدون طرح `pre_campaign_count`**. بما أن `active_subs` (من `GetSubCustomerActiveSubs`) رقم لحظي يشمل كل رصيد الوكيل (قديم + حملة)، فإن الوكلاء أصحاب `pre_campaign_count` الكبير سيظهر لهم `new_line_count`/`campaign_increase` مضخَّماً بمقدار قريب من كامل رصيدهم القديم — وليس فقط الإضافات الفعلية خلال الحملة.
@@ -861,6 +892,24 @@ Admin يفتح /admin/club-change-requests:
 **الأثر المُثبَت كمياً (اختبار حقيقي 2026-07-09):** وكيل بـ `pre_campaign_count=1348`, `transfer_count=68` (حقيقي وموثوق) — تحت الصيغة الجديدة قفز `campaign_increase` إلى ~1433 (بدل ~85 الصحيح)، فتأهّل لنادي القمة (جائزة 70,000₪) بدل نادي التفوق (35,000₪ الصحيح) — فرق 35,000₪ لوكيل واحد فقط. هذا النمط يتكرر مع أي وكيل عنده رصيد قديم كبير + تحويل حقيقي كافٍ لأي نادٍ.
 
 **القرار:** عُرض هذا التحليل الكمي على صاحب المشروع بوضوح (بما فيه المثال أعلاه)، وأكّد صراحة المتابعة بهذه الصيغة عن قصد. **هذا ليس خللاً غير مكتشَف — هو قرار عمل موثَّق.** لا يُصلَح إلا بطلب صريح لاحق من صاحب المشروع.
+
+---
+
+### ~~TD-013~~: ✅ مُصلَح — Campaign Increase تغيّرت مرة أخرى (2026-07-13)
+
+**الوضع السابق:** `campaign_increase = transfer_count + new_line_count` (TD-004)، والمشكلة الموروثة معها (TD-012 أعلاه) — `new_line_count` قد يشمل كامل الرصيد القديم للوكيل، فيظهر "الزيادة" مضخَّمة بشكل كبير (مثال حقيقي: وكيل بـ `baseline_count=1665`, `current_total=1670` أظهر زيادة = 1670 بدل 5 الصحيحة).
+
+**القرار الجديد:** طلب صريح من صاحب المشروع بتاريخ 2026-07-13 (هذا الطلب هو "الطلب الصريح اللاحق" الذي كانت TD-012 تشترطه) بتغيير الصيغة إلى: **`campaign_increase = max(0, current_total - baseline_count)`** — مقارنة مباشرة بين الرصيد اللحظي والأساس المجمّد منذ بداية الحملة، بغض النظر عن `transfer_count`/`new_line_count`. هذه الحقول تبقى مخزّنة ومعروضة كبطاقات معلوماتية فقط ("التحويلات"، "الخطوط الجديدة") ولم تعد جزءاً من حساب الزيادة أو تأهيل الأندية.
+
+**لماذا `baseline_count` وليس `pre_campaign_count`:** بمسار المزامنة الفعّال حالياً (Deals API كل دقيقة، `ProcessDataImport::readDealsApi()`)، `pre_campaign_count` لا يتحدّث فعلياً بعد إنشاء الوكيل (استجابة الـ API لا ترجع هذا المفتاح، وكذلك استيراد Excel للمزامنة اليومية). لذلك الاعتماد على `baseline_count` (المجمّد فعلياً وتصميمياً) أكثر أماناً من `pre_campaign_count` (المجمّد فعلياً لكن بالصدفة/بسبب نقص بالمزامنة).
+
+**مُصلَح في 17 ملف (2026-07-13):**
+- Accessors: `Agent::getCampaignIncreaseAttribute()`, `DailySnapshot::getCampaignIncreaseAttribute()`
+- Jobs/Observer: `ProcessDataImport`, `ProcessAgentSelfSync`, `AgentObserver::checkAndApplyPromotion()`
+- لوحة الإدارة: `AgentResource` (عمود + `autoAssignClub`)، `ViewAgent`، `EditAgent`، `CreateAgent`
+- لوحة الموزع: `MyAgentsResource`، `ViewMyAgent`، `AgentsRelationManager`، `DistributorOverviewWidget` (SQL: `SUM(GREATEST(0, current_total - baseline_count))`)
+- التصدير: `AgentsExport`
+- بوابة الوكيل: `AgentAssistant` (System Prompt)، `AgentProgress` (رسم بياني أسبوعي/شهري)، `dashboard.blade.php` (3 مواضع)
 
 ---
 
@@ -1417,5 +1466,6 @@ ProcessAgentSelfSync::handle()
 *آخر تحديث: 2026-06-20 (الإصدار 3.0 — نظام Agent Self-Sync) — إضافة §12.10 شرح كامل لنظام المزامنة الذاتية. إضافة `ProcessAgentSelfSync` job (synchronous، لا queue) في §5.2. إضافة `AgentSyncing` Livewire component في §12.4. إضافة مسار `/syncing` في §12.3 (10 مسارات). تحديث Auth Flow في §12.2 (enter → /syncing → wire:init → dashboard). تحديث Agent Model §12.7 وجدول agents §2.1 بحقل `last_self_sync_at`. تحديث AppSetting §5.8 لإضافة `ProcessAgentSelfSync` في deals_api_*. إضافة مخاطرة Self-Sync API Latency في §7.1. إصلاحان حرجان: (1) `DailySnapshot.import_id NOT NULL` → استخدام `update()` لا `updateOrCreate()` — كان يمنع إنشاء ClubChangeRequest كلياً. (2) Queue dependency → wire:init synchronous pattern بلا queue worker.*
 *آخر تحديث: 2026-06-25 (الإصدار 3.1 — تحسينات بوابة الوكيل + إصلاحات لوحة الموزع) — بوابة الوكيل: دمج "الخطوط الجديدة" كسطر تفصيلي داخل "إجمالي الزيادة". بطاقة تحفيزية ديناميكية للوكلاء خارج الأندية (6 مراحل). شريط الحالة الحي بـ 6 حالات ديناميكية بدلاً من "وضعك جيد" الثابتة. إصلاح حساب ترتيب النادي (`transfer_count` بدل `current_total`، بدون إظهار العدد الكلي). إصلاح مقياس شريط التقدم (unified scale). حذف "المخطط الزمني للأداء" من ViewAgent + حذف `daily-progress-chart.blade.php`. لوحة الموزع: إصلاح N+1 في `agents_count` (`->counts('agents')`). إصلاح badge الفارغ في RelationManager. إضافة حقل الموزع في ViewAgent مع رابط. جعل `distributor_id` اختيارياً في نموذج Agent. تحديث §3.2، §5.5، §5.7، §7.1، §8، §12.4.*
 *آخر تحديث: 2026-06-26 (الإصدار 3.2 — مساعد ذكي + إعادة تصميم Home) — إضافة `AgentAssistant` Livewire component: مساعد AI باللهجة الفلسطينية مُضمَّن كـ floating popup (FAB) في بوابة الوكيل، يتصل بـ Groq API (llama-3.3-70b-versatile)، system prompt يشمل أرقام الوكيل + مكافآت + فرص سحب + جوائز الأندية. إصلاح `wire:loading.flex` (كانت dots دائماً ظاهرة بسبب conflict مع inline `display:flex`). إعادة كتابة `welcome.blade.php` بتصميم "Sky Portal" داكن متحرك. تحديث §12.4، §12.9، §5.7.*
+*آخر تحديث: 2026-07-13 — إصلاح TD-013: `campaign_increase` أصبحت `max(0, current_total - baseline_count)` بدل `transfer_count + new_line_count` (بطلب صريح من صاحب المشروع، يُنهي تعليق TD-012). عدّل 17 ملف: `Agent`/`DailySnapshot` accessors، `ProcessDataImport`/`ProcessAgentSelfSync`/`AgentObserver`، لوحة الإدارة (`AgentResource`, `ViewAgent`, `EditAgent`, `CreateAgent`)، لوحة الموزع (`MyAgentsResource`, `ViewMyAgent`, `AgentsRelationManager`, `DistributorOverviewWidget`)، `AgentsExport`، وبوابة الوكيل (`AgentAssistant`, `AgentProgress`, `dashboard.blade.php`). `transfer_count`/`new_line_count` باتت حقول عرض معلوماتية فقط، لم تعد جزءاً من حساب الزيادة أو تأهيل الأندية. تحديث §4.5 و§8 (TD-012/TD-013).*
 *آخر تحديث: 2026-07-08 (اكتشاف `GetSubCustomerActiveSubs` + طبقة تحقق تكميلية) — إضافة §4.5 يوثّق الفرق الجوهري بين `GetSubCustomerDeals` (مصدر الحقيقة لحساب الترقية) و`GetSubCustomerActiveSubs` (API جديد اكتُشف ويُختبَر: يرجّع رقم `active_subs` إجمالي واحد "لقطة حالية"، لا يتأثر بـ `from`/`to`، ولا يفرّق `task_name` — تأكَّد بالاختبار الفعلي). قرار هندسي: **لا يُستخدم كبديل** لأنه يُسقط شرط الـ 60% تحويل (`required_transfer_count`، §4.4) لو اعتُمد في `ProcessDataImport`/`ProcessAgentSelfSync`. اقتُصر استخدامه على: (1) `DealsApiSettings::testConnection()` — يفحص الآن الـ apiName الاثنين بحالتين منفصلتين (§5.5.1)، (2) بطاقة تشخيصية جديدة "الرقم الفعلي من المزوّد" في `AgentDealsInspector` تقارنه مع `current_total` المخزّن (`fetchActiveSubsCount()`) بدون أي كتابة لقاعدة البيانات. كما وُثِّقت صفحة `AgentDealsInspector` بالكامل لأول مرة في §5.5.1 (كانت غير موثّقة). لا migration، لا تعديل على `processAgentRow()`/`AgentObserver`/`ClubChangeRequest`. تحديث §4.5 (جديد)، §5.5.1.*
 *يجب تحديثه عند أي تغيير جوهري في: ProcessDataImport، AgentObserver، بنية الـ Clubs، نظام المصادقة، Agent Portal، Console Commands المجدولة، أو SyncStatusBadge.*

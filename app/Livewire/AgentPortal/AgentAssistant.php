@@ -73,7 +73,7 @@ class AgentAssistant extends Component
     {
         $agent    = $this->agent;
         $club     = $agent->club;
-        $increase = $agent->transfer_count + $agent->new_line_count;
+        $increase = $agent->campaign_increase;
 
         $clubs    = Club::where('is_active', true)->orderBy('club_order')->get();
         $nextClub = $clubs->first(fn($c) => $c->club_order > ($club?->club_order ?? 0));

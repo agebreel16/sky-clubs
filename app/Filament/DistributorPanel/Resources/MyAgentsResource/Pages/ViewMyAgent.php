@@ -137,7 +137,7 @@ class ViewMyAgent extends ViewRecord
                         ->label('الزيادة في الحملة')
                         ->size('lg')
                         ->weight('bold')
-                        ->getStateUsing(fn (Agent $record): int => $record->transfer_count + $record->new_line_count)
+                        ->getStateUsing(fn (Agent $record): int => $record->campaign_increase)
                         ->badge()
                         ->color('success'),
 

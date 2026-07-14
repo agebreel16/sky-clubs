@@ -1,4 +1,40 @@
 <div>
+    <style>
+        .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; align-items: stretch; }
+        .eq-card { display: flex; flex-direction: column; }
+        .eq-stack { display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: space-between; }
+        .eq-line { text-align: center; padding: 12px 10px; border-radius: 12px; background: var(--slate-50); }
+        .eq-line-value { font-size: 24px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--slate-800); }
+        .eq-line-label { font-size: 11px; font-weight: 600; color: var(--slate-500); margin-top: 4px; }
+        .eq-line-total { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.25); }
+        .eq-line-total .eq-line-value { color: var(--success); font-size: 28px; }
+        .eq-line-total .eq-line-label { color: var(--success); font-weight: 700; }
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; }
+            .eq-stack { flex-direction: row; }
+            .eq-line { flex: 1; }
+        }
+
+        .score-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+        .score-eyebrow { font-size: 11px; letter-spacing: .1em; color: var(--slate-500); text-transform: uppercase; font-weight: 600; }
+        .score-club { font-size: 17px; font-weight: 700; color: var(--slate-800); margin-top: 3px; }
+        .score-ring { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+        .score-ring-inner { width: 66px; height: 66px; border-radius: 50%; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(15,23,42,.04); }
+        .score-ring-num { font-size: 20px; font-weight: 800; line-height: 1; }
+        .score-ring-den { font-size: 10px; color: var(--slate-400); font-weight: 600; margin-top: 1px; }
+        .score-rows { display: flex; flex-direction: column; gap: 10px; }
+        .score-row { padding: 10px 14px; border-radius: 10px; background: var(--slate-50); }
+        .score-row-head { display: flex; align-items: center; justify-content: space-between; }
+        .score-row-label { font-size: 12px; font-weight: 600; color: #64748b; }
+        .score-row-pts { font-size: 11px; font-weight: 700; }
+        .score-row-val { font-size: 13px; color: #334155; margin-top: 2px; font-variant-numeric: tabular-nums; }
+        .score-row-bar { height: 5px; background: var(--slate-200); border-radius: 999px; margin-top: 6px; overflow: hidden; }
+        .score-row-fill { height: 100%; border-radius: 999px; }
+        .score-foot { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; text-align: center; }
+    </style>
+
+    <div class="hero-grid">
+
     {{-- Hero Card --}}
     @if($agent->club)
         @php
@@ -94,7 +130,7 @@
     @else
         @php
             $firstClub = \App\Models\Club::where('is_active', true)->orderBy('club_order')->first();
-            $needed    = $firstClub ? max(0, $firstClub->required_increase - ($agent->transfer_count + $agent->new_line_count)) : 0;
+            $needed    = $firstClub ? max(0, $firstClub->required_increase - $agent->campaign_increase) : 0;
         @endphp
         <div class="hero" style="background:linear-gradient(135deg,#475569 0%,#64748b 100%);">
             <div class="grid-bg"></div>
@@ -125,6 +161,34 @@
         </div>
     @endif
 
+    {{-- خطوط الحملة: قبل / اليوم / الفرق --}}
+    @php
+        $eqBefore = (int) $agent->pre_campaign_count;
+        $eqNow    = (int) $agent->current_total;
+        $eqDiff   = max(0, $eqNow - $eqBefore);
+    @endphp
+    <div class="card card-pad eq-card">
+        <div class="section-head" style="margin:0 0 14px;">
+            <h2>خطوط الحملة</h2>
+        </div>
+        <div class="eq-stack">
+            <div class="eq-line">
+                <div class="eq-line-value" style="color:var(--slate-400);">{{ number_format($eqBefore) }}</div>
+                <div class="eq-line-label">قبل الحملة</div>
+            </div>
+            <div class="eq-line">
+                <div class="eq-line-value" style="color:var(--primary);">{{ number_format($eqNow) }}</div>
+                <div class="eq-line-label">حتى اليوم</div>
+            </div>
+            <div class="eq-line eq-line-total">
+                <div class="eq-line-value">{{ number_format($eqDiff) }}</div>
+                <div class="eq-line-label">داخل الحملة</div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
     {{-- Violator Banner --}}
     @if($agent->is_violator)
         <div class="warn" style="border-color:#ef4444;background:rgba(239,68,68,0.08);">
@@ -133,7 +197,7 @@
             </div>
             <div class="warn-body">
                 <div class="warn-title" style="color:#ef4444;">تنبيه: حسابك مُعلَّق من قِبَل الإدارة</div>
-                <div class="warn-desc">للاستفسار تواصل مع مشرفك المباشر.</div>
+                <div class="warn-desc">للاستفسار تواصل مع الموزع .</div>
             </div>
         </div>
     @endif
@@ -154,7 +218,7 @@
         }
 
         if ($agent->club) {
-            $scIncrease    = $agent->transfer_count + $agent->new_line_count;
+            $scIncrease    = $agent->campaign_increase;
             $scNeeded      = $nextClub ? max(0, $nextClub->required_increase - $scIncrease) : 0;
             $scTransferMet = !$nextClub || $agent->transfer_count >= ($nextClub->required_transfer_count ?? 0);
             $scRatioPct    = $nextClub ? ($nextClub->required_transfer_percentage ?? 0) : 0;
@@ -279,13 +343,86 @@
     </div>
     @endif
 
+    {{-- رحلتك في الأندية --}}
+    @php
+        $agentIncrease = $agent->campaign_increase;
+        $maxR          = $clubs->take(5)->max('required_increase') ?: 1;
+        $fillPct       = min(100, round(($agentIncrease / $maxR) * 100));
+    @endphp
+    <div class="card card-pad" style="margin-top:18px;">
+        <div class="score-row-label" style="margin-bottom:12px;">رحلتك في الأندية</div>
+        <div style="position:relative;">
+            <div class="progress-track">
+                <div class="progress-fill" style="width:0%;transition:width 1s ease-out;" data-fill-width="{{ $fillPct }}%"></div>
+            </div>
+            <div class="milestones">
+                @foreach($clubs->take(5) as $c)
+                    @php
+                        $maxR    = $clubs->max('required_increase') ?: 1;
+                        $pct     = round(($c->required_increase / $maxR) * 100);
+                        $passed  = $agent->club && $agent->club->club_order >= $c->club_order;
+                        $current = $agent->club && $agent->current_club_id === $c->club_id;
+                    @endphp
+                    <div class="milestone {{ $passed ? 'passed' : '' }} {{ $current ? 'current' : '' }}" style="right:{{ $pct }}%;">
+                        <div class="milestone-dot"></div>
+                        <div class="milestone-label">{{ $c->club_name }}</div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    {{-- شروط الأندية: المحافظة على النادي الحالي + الهدف القادم --}}
+    @php
+        $scoreFor = function ($targetClub) use ($agent) {
+            $reqInc   = (int) $targetClub->required_increase;
+            $reqTrans = (int) ($targetClub->required_transfer_count ?? 0);
+            $incVal   = (int) $agent->campaign_increase;
+            $transVal = (int) $agent->transfer_count;
+
+            $incPts   = $reqInc > 0 ? min(50, (int) round(50 * $incVal / $reqInc)) : 50;
+            $transPts = $reqTrans > 0 ? min(50, (int) round(50 * $transVal / $reqTrans)) : 50;
+
+            return [
+                'club'      => $targetClub,
+                'incVal'    => $incVal,
+                'reqInc'    => $reqInc,
+                'incPts'    => $incPts,
+                'incMet'    => $incVal >= $reqInc,
+                'transVal'  => $transVal,
+                'reqTrans'  => $reqTrans,
+                'transPts'  => $transPts,
+                'transMet'  => $transVal >= $reqTrans,
+                'showTrans' => $reqTrans > 0,
+                'total'     => $incPts + $transPts,
+            ];
+        };
+
+        $maintainScore = $agent->club ? $scoreFor($agent->club) : null;
+        $nextScore     = $nextClub ? $scoreFor($nextClub) : null;
+    @endphp
     <div class="block-grid cols-2" style="margin-top:18px;align-items:start;">
 
-        {{-- العمود الرئيسي: الهدف القادم --}}
-        <div>
+        {{-- بطاقة: المحافظة على النادي الحالي (فقط لمن هو منضم لنادٍ) --}}
+        @if($maintainScore)
+            <div>
+                <div class="section-head">
+                    <h2> النادي الحالي</h2>
+           
+                </div>
+                @include('livewire.agent-portal.partials.score-card', [
+                    'score'     => $maintainScore,
+                    'eyebrow'   => 'ناديك الحالي',
+                    'metText'   => '✅ محافظ على النادي — مستوفي لجميع الشروط',
+                    'unmetText' => '⚠️ انتبه: أنت حالياً دون متطلبات هذا النادي',
+                ])
+            </div>
+        @endif
+
+        {{-- بطاقة: الهدف القادم --}}
+        <div @if(!$maintainScore) style="grid-column:1 / -1;" @endif>
             <div class="section-head">
                 <h2>الهدف القادم</h2>
-                <span class="meta">رحلتك في الأندية</span>
             </div>
             @if($agent->club && !$nextClub)
                 <div class="next-goal" style="background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);border:1px solid #fde68a;">
@@ -308,161 +445,50 @@
                     <div class="progress-need">استمر في التميز للحفاظ على مكانتك</div>
                 </div>
             @else
-                @php
-                    $agentIncrease = $agent->transfer_count + $agent->new_line_count;
-                    $needed        = $nextClub ? max(0, $nextClub->required_increase - $agentIncrease) : 0;
-                    $maxR          = $clubs->take(5)->max('required_increase') ?: 1;
-                    $fillPct       = min(100, round(($agentIncrease / $maxR) * 100));
-                @endphp
-                <div class="next-goal">
-                    <div class="next-goal-head">
-                        <div class="next-goal-target">
-                            <div class="next-goal-target-icon">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M6 2h12l4 7-10 13L2 9z" opacity=".9"/></svg>
-                            </div>
-                            <div>
-                                <div class="next-goal-eyebrow">الهدف القادم</div>
-                                <div class="next-goal-name">{{ $nextClub?->club_name ?? 'نادي البداية' }}</div>
-                            </div>
-                        </div>
-                        <div class="next-goal-need">
-                            <div class="next-goal-need-num" x-data="countUp({{ $needed }})" x-init="init()">
-                                +<span x-text="formatted"></span>
-                                <small>زيادة</small>
-                            </div>
-                            <div class="next-goal-need-label">للوصول</div>
-                        </div>
-                    </div>
-                    <div style="position:relative;">
-                        <div class="progress-track">
-                            <div class="progress-fill" style="width:0%;transition:width 1s ease-out;" data-fill-width="{{ $fillPct }}%"></div>
-                        </div>
-                        <div class="milestones">
-                            @foreach($clubs->take(5) as $c)
-                                @php
-                                    $maxR    = $clubs->max('required_increase') ?: 1;
-                                    $pct     = round(($c->required_increase / $maxR) * 100);
-                                    $passed  = $agent->club && $agent->club->club_order >= $c->club_order;
-                                    $current = $agent->club && $agent->current_club_id === $c->club_id;
-                                @endphp
-                                <div class="milestone {{ $passed ? 'passed' : '' }} {{ $current ? 'current' : '' }}" style="right:{{ $pct }}%;">
-                                    <div class="milestone-dot"></div>
-                                    <div class="milestone-label">{{ $c->club_name }}</div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                    <div class="progress-need">
-                        @if($needed === 0)
-                            <span style="color:#16a34a;font-weight:700;">✓ حققت إجمالي الزيادة</span>
-                            — ركّز الآن على خطوط التحويل للترقية
-                        @else
-                            تحتاج <strong style="color:var(--primary);font-weight:700;">+{{ $needed }} زيادة</strong> إضافية للوصول إلى {{ $nextClub?->club_name ?? 'أول نادٍ' }}
-                        @endif
-                    </div>
-
-                    {{-- تفصيل شروط الترقية --}}
-                    @if($nextClub)
-                        @php
-                            $transferMet   = $agent->transfer_count >= $nextClub->required_transfer_count;
-                            $totalMet      = $agentIncrease         >= $nextClub->required_increase;
-                            $ratioPct      = $nextClub->required_transfer_percentage ?? 0;
-                            $agentRatioPct = ($nextClub && $nextClub->required_increase > 0)
-                                ? round($agent->transfer_count / $nextClub->required_increase * 100, 1)
-                                : 0;
-                            $ratioMet      = $ratioPct <= 0 || $agentRatioPct >= ($ratioPct * 100);
-                        @endphp
-                        <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
-
-                            {{-- الشرط 1: إجمالي الزيادة (مع تفصيل التحويل + الجديدة) --}}
-                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:10px;background:{{ $totalMet ? '#f0fdf4' : '#fff7ed' }};border:1px solid {{ $totalMet ? '#86efac' : '#fed7aa' }};">
-                                <div>
-                                    <div style="font-size:12px;font-weight:600;color:#64748b;">إجمالي الزيادة</div>
-                                    <div style="font-size:13px;color:#334155;margin-top:1px;">{{ $agentIncrease }} / {{ $nextClub->required_increase }}</div>
-                                    <div style="font-size:11px;color:#94a3b8;margin-top:3px;">تحويل: {{ $agent->transfer_count }}  •  جديدة: {{ $agent->new_line_count }}</div>
-                                </div>
-                                @if($totalMet)
-                                    <span style="font-size:11px;font-weight:700;color:#16a34a;background:#dcfce7;padding:3px 10px;border-radius:999px;">✓ محقق</span>
-                                @else
-                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">متبقي {{ $nextClub->required_increase - $agentIncrease }}</span>
-                                @endif
-                            </div>
-
-                            {{-- الشرط 3: خطوط التحويل --}}
-                            @if($nextClub->required_transfer_count > 0)
-                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:10px;background:{{ $transferMet ? '#f0fdf4' : '#fff7ed' }};border:1px solid {{ $transferMet ? '#86efac' : '#fed7aa' }};">
-                                <div>
-                                    <div style="font-size:12px;font-weight:600;color:#64748b;">خطوط التحويل</div>
-                                    <div style="font-size:13px;color:#334155;margin-top:1px;">{{ $agent->transfer_count }} / {{ $nextClub->required_transfer_count }}</div>
-                                </div>
-                                @if($transferMet)
-                                    <span style="font-size:11px;font-weight:700;color:#16a34a;background:#dcfce7;padding:3px 10px;border-radius:999px;">✓ محقق</span>
-                                @else
-                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">متبقي {{ $nextClub->required_transfer_count - $agent->transfer_count }}</span>
-                                @endif
-                            </div>
-                            @endif
-
-                            {{-- الشرط 3: نسبة التحويل (إذا مطلوبة) --}}
-                            @if($ratioPct > 0)
-                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:10px;background:{{ $ratioMet ? '#f0fdf4' : '#fff7ed' }};border:1px solid {{ $ratioMet ? '#86efac' : '#fed7aa' }};">
-                                <div>
-                                    <div style="font-size:12px;font-weight:600;color:#64748b;">نسبة التحويل</div>
-                                    <div style="font-size:13px;color:#334155;margin-top:1px;">{{ $agentRatioPct }}% / {{ round($ratioPct * 100) }}%</div>
-                                </div>
-                                @if($ratioMet)
-                                    <span style="font-size:11px;font-weight:700;color:#16a34a;background:#dcfce7;padding:3px 10px;border-radius:999px;">✓ محقق</span>
-                                @else
-                                    <span style="font-size:11px;font-weight:700;color:#ea580c;background:#ffedd5;padding:3px 10px;border-radius:999px;">غير محقق</span>
-                                @endif
-                            </div>
-                            @endif
-
-                        </div>
-                    @endif
-                </div>
+                @include('livewire.agent-portal.partials.score-card', [
+                    'score'     => $nextScore,
+                    'eyebrow'   => 'الهدف القادم',
+                    'metText'   => '✓ حققت كل الشروط — بانتظار تحديث الترقية',
+                    'unmetText' => 'تحتاج مزيد من الجهد للوصول إلى ' . ($nextClub?->club_name ?? 'النادي القادم'),
+                ])
             @endif
         </div>
 
-        {{-- العمود الجانبي: متطلبات البقاء + Pressure Meter --}}
-        <div style="display:flex;flex-direction:column;gap:16px;">
+    </div>
 
-            {{-- فرصك المكتسبة --}}
-            @php
-                $opps      = $agent->opportunities()->selectRaw('type, count(*) as total')->groupBy('type')->pluck('total', 'type');
-                $entryOpps = (int)($opps['entry'] ?? 0);
-                $firstOpps = (int)($opps['first_arrival'] ?? 0);
-                $bonusOpps = (int)($opps['bonus'] ?? 0);
-                $maintOpps = (int)($opps['maintenance'] ?? 0);
-                $totalOpps = $entryOpps + $firstOpps + $bonusOpps + $maintOpps;
-            @endphp
-            <div class="card card-pad">
-                <div class="section-head" style="margin:0 0 14px;">
-                    <h2>فرصك المكتسبة</h2>
-                    <span class="meta" style="font-size:18px;font-weight:800;color:var(--primary);">{{ $totalOpps }} فرصة</span>
+    {{-- فرصك المكتسبة --}}
+    @php
+        $opps      = $agent->opportunities()->selectRaw('type, count(*) as total')->groupBy('type')->pluck('total', 'type');
+        $entryOpps = (int)($opps['entry'] ?? 0);
+        $firstOpps = (int)($opps['first_arrival'] ?? 0);
+        $bonusOpps = (int)($opps['bonus'] ?? 0);
+        $maintOpps = (int)($opps['maintenance'] ?? 0);
+        $totalOpps = $entryOpps + $firstOpps + $bonusOpps + $maintOpps;
+    @endphp
+    <div class="card card-pad" style="margin-top:18px;">
+        <div class="section-head" style="margin:0 0 14px;">
+            <h2>فرصك المكتسبة</h2>
+            <span class="meta" style="font-size:18px;font-weight:800;color:var(--primary);">{{ $totalOpps }} فرصة</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            @foreach([
+                ['label' => 'فرص الدخول',   'val' => $entryOpps, 'color' => '#0ea5e9', 'bg' => '#e0f2fe'],
+                ['label' => 'أول وصول',      'val' => $firstOpps, 'color' => '#f59e0b', 'bg' => '#fffbeb'],
+                ['label' => 'فرص إضافية',    'val' => $bonusOpps, 'color' => '#8b5cf6', 'bg' => '#faf5ff'],
+                ['label' => 'المحافظة شهرية',  'val' => $maintOpps, 'color' => '#10b981', 'bg' => '#f0fdf4'],
+            ] as $row)
+                @if($row['val'] > 0)
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:{{ $row['bg'] }};border-radius:10px;">
+                        <span style="font-size:13px;font-weight:500;color:#475569;">{{ $row['label'] }}</span>
+                        <span style="font-size:16px;font-weight:800;color:{{ $row['color'] }};">{{ $row['val'] }}</span>
+                    </div>
+                @endif
+            @endforeach
+            @if($totalOpps === 0)
+                <div style="text-align:center;padding:24px;color:var(--slate-400);font-size:13px;">
+                    لم تكسب فرص سحب بعد — انضم لنادٍ لتبدأ
                 </div>
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    @foreach([
-                        ['label' => 'فرص الدخول',   'val' => $entryOpps, 'color' => '#0ea5e9', 'bg' => '#e0f2fe'],
-                        ['label' => 'أول وصول',      'val' => $firstOpps, 'color' => '#f59e0b', 'bg' => '#fffbeb'],
-                        ['label' => 'فرص إضافية',    'val' => $bonusOpps, 'color' => '#8b5cf6', 'bg' => '#faf5ff'],
-                        ['label' => 'المحافظة شهرية',  'val' => $maintOpps, 'color' => '#10b981', 'bg' => '#f0fdf4'],
-                    ] as $row)
-                        @if($row['val'] > 0)
-                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:{{ $row['bg'] }};border-radius:10px;">
-                                <span style="font-size:13px;font-weight:500;color:#475569;">{{ $row['label'] }}</span>
-                                <span style="font-size:16px;font-weight:800;color:{{ $row['color'] }};">{{ $row['val'] }}</span>
-                            </div>
-                        @endif
-                    @endforeach
-                    @if($totalOpps === 0)
-                        <div style="text-align:center;padding:24px;color:var(--slate-400);font-size:13px;">
-                            لم تكسب فرص سحب بعد — انضم لنادٍ لتبدأ
-                        </div>
-                    @endif
-                </div>
-            </div>
-
+            @endif
         </div>
     </div>
 </div>

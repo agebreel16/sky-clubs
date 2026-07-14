@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Agent;
 use App\Models\AuditLog;
 use App\Models\Club;
+use App\Models\ClubChangeRequest;
 use App\Models\HistoryLog;
 use App\Models\Opportunity;
 use App\Models\Reward;
@@ -182,7 +183,7 @@ class AgentObserver
         $agent->refresh();
 
         $clubs            = Club::where('is_active', true)->orderBy('club_order')->get();
-        $campaignIncrease = $agent->transfer_count + $agent->new_line_count;
+        $campaignIncrease = $agent->campaign_increase;
         $currentClub      = $agent->club;
         $currentOrder     = $currentClub ? (int) $currentClub->club_order : 0;
 
@@ -208,6 +209,11 @@ class AgentObserver
             'entry_date'      => now(),
             'is_first_arrival' => $isFirst,
         ]);
+
+        // التعديل اليدوي هو أحدث حقيقة — أي طلب معلّق سابق (لأي نادٍ) أصبح غير ذي صلة
+        ClubChangeRequest::where('agent_id', $agent->agent_id)
+            ->where('status', 'pending')
+            ->update(['status' => 'auto_cancelled']);
 
         HistoryLog::create([
             'agent_id'        => $agent->agent_id,

@@ -73,7 +73,7 @@ class MyAgentsResource extends Resource
 
                 TextColumn::make('campaign_increase')
                     ->label('الزيادة')
-                    ->getStateUsing(fn (Agent $record): int => $record->transfer_count + $record->new_line_count)
+                    ->getStateUsing(fn (Agent $record): int => $record->campaign_increase)
                     ->badge()
                     ->color('success')
                     ->sortable(false),

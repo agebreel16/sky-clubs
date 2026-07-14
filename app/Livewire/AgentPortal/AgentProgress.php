@@ -20,11 +20,11 @@ class AgentProgress extends AgentPortalPage
     {
         $snapshots = $this->agent->dailySnapshots()
             ->orderBy('data_date')
-            ->get(['data_date', 'transfer_count', 'new_line_count']);
+            ->get(['data_date', 'current_total', 'baseline_count']);
 
-        // transfer_count و new_line_count تراكميان من بداية الحملة
+        // campaign_increase (current_total - baseline_count) تراكمي من بداية الحملة
         // الزيادة الفعلية = آخر قيمة في الفترة - آخر قيمة قبل بداية الفترة
-        $getValue = fn($snap) => $snap ? $snap->transfer_count + $snap->new_line_count : 0;
+        $getValue = fn($snap) => $snap ? $snap->campaign_increase : 0;
 
         $weeks = [];
         for ($i = 0; $i < 4; $i++) {

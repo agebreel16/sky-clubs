@@ -8,6 +8,7 @@ use App\Models\ClubChangeRequest;
 use App\Models\DataImport;
 use App\Models\DailySnapshot;
 use App\Models\Opportunity;
+use App\Support\DealsApiCalculator;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -158,7 +159,7 @@ class ProcessDataImport implements ShouldQueue
         // استثناء المخالفين من استعلام الـ API
         $agents = Agent::whereNull('deleted_at')
             ->where('is_violator', false)
-            ->get(['agent_id', 'pre_campaign_count']);
+            ->get(['agent_id', 'pre_campaign_count', 'baseline_count']);
 
         $this->totalAgentsQueried = $agents->count();
 
@@ -217,7 +218,7 @@ class ProcessDataImport implements ShouldQueue
                 }
 
                 $dealsBody = $dealsResponse->json();
-                if (($dealsBody['result'] ?? '') !== 'SUCCESS') {
+                if (! DealsApiCalculator::isSuccess($dealsBody)) {
                     $reason = $dealsBody['message'] ?? $dealsBody['result'] ?? 'غير معروف';
                     Log::warning("GetSubCustomerDeals: نتيجة غير ناجحة للوكيل {$agent->agent_id}", ['body' => $dealsBody]);
                     $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'API أعاد (Deals): ' . $reason];
@@ -225,29 +226,22 @@ class ProcessDataImport implements ShouldQueue
                 }
 
                 $subsBody = $subsResponse->json();
-                if (($subsBody['result'] ?? '') !== 'SUCCESS') {
+                if (! DealsApiCalculator::isSuccess($subsBody)) {
                     $reason = $subsBody['message'] ?? $subsBody['result'] ?? 'غير معروف';
                     Log::warning("GetSubCustomerActiveSubs: نتيجة غير ناجحة للوكيل {$agent->agent_id}", ['body' => $subsBody]);
                     $this->apiErrors[] = ['agent_id' => $agent->agent_id, 'error' => 'API أعاد (ActiveSubs): ' . $reason];
                     continue;
                 }
 
-                // transfer_count: من GetSubCustomerDeals — مصدر موثوق لهذا الحقل فقط
-                $rows      = collect($dealsBody['data'] ?? []);
-                $transfers = (int) $rows->where('task_name', 'number-portability')->where('status', 'Activated')->sum(fn ($r) => (int) $r['count']);
-
-                // active_subs: لقطة لحظية كاملة (قديم + حملة) من GetSubCustomerActiveSubs — لا تتأثر بـ from/to
-                $subsRow    = collect($subsBody['data'] ?? [])->first();
-                $activeSubs = $subsRow !== null ? (int) ($subsRow['active_subs'] ?? 0) : 0;
-
-                // new_line_count مشتق: active_subs ناقص التحويل (بدون طرح pre_campaign_count)
-                $newLines = max(0, $activeSubs - $transfers);
+                $transfers  = DealsApiCalculator::extractTransferCount($dealsBody);
+                $activeSubs = DealsApiCalculator::extractActiveSubs($subsBody);
+                $totals     = DealsApiCalculator::computeTotals($activeSubs, $transfers, (int) $agent->pre_campaign_count, (int) $agent->baseline_count);
 
                 $data[] = [
                     'agent_id'       => $agent->agent_id,
-                    'new_line_count' => $newLines,
-                    'transfer_count' => $transfers,
-                    'current_total'  => $activeSubs,
+                    'new_line_count' => $totals['new_line_count'],
+                    'transfer_count' => $totals['transfer_count'],
+                    'current_total'  => $totals['current_total'],
                 ];
             }
 
@@ -398,7 +392,7 @@ class ProcessDataImport implements ShouldQueue
 
         // [4] حساب التأهيل
         $agent->refresh();
-        $campaignIncrease = $agent->transfer_count + $agent->new_line_count;
+        $campaignIncrease = $agent->campaign_increase;
 
         $bestClub = null;
         foreach ($clubs as $club) {
@@ -412,10 +406,10 @@ class ProcessDataImport implements ShouldQueue
         $currentOrder = $currentClub ? (int) $currentClub->club_order : 0;
         $newOrder     = $bestClub    ? (int) $bestClub->club_order    : 0;
 
-        // [5] الطلب المعلّق الموجود لهذا الوكيل
-        $existingPending = ClubChangeRequest::where('agent_id', $agent->agent_id)
-            ->where('status', 'pending')
-            ->first();
+        // [5] نوع التغيير المكتشف (إن وجد)
+        $changeType = $newOrder > $currentOrder
+            ? 'promotion'
+            : (($currentClub && $newOrder < $currentOrder) ? 'demotion' : null);
 
         // [6] Snapshot للطلب
         $snapshot = [
@@ -428,80 +422,19 @@ class ProcessDataImport implements ShouldQueue
                 : 0,
         ];
 
-        // ── PROMOTION مكتشفة ────────────────────────────────────────────────
-        if ($newOrder > $currentOrder) {
-            if ($existingPending) {
-                if ($existingPending->change_type === 'promotion'
-                    && $existingPending->to_club_id === $bestClub->club_id) {
-                    // نفس الطلب — تحديث snapshot فقط
-                    $existingPending->update(['agent_stats_snapshot' => $snapshot]);
-                } else {
-                    // طلب قديم مختلف — إلغاء وإنشاء جديد
-                    $existingPending->update(['status' => 'auto_cancelled']);
-                    ClubChangeRequest::create([
-                        'agent_id'             => $agent->agent_id,
-                        'import_id'            => $this->import->import_id,
-                        'from_club_id'         => $agent->current_club_id,
-                        'to_club_id'           => $bestClub->club_id,
-                        'change_type'          => 'promotion',
-                        'agent_stats_snapshot' => $snapshot,
-                        'status'               => 'pending',
-                    ]);
-                    $stats['pending_promotions']++;
-                }
-            } else {
-                ClubChangeRequest::create([
-                    'agent_id'             => $agent->agent_id,
-                    'import_id'            => $this->import->import_id,
-                    'from_club_id'         => $agent->current_club_id,
-                    'to_club_id'           => $bestClub->club_id,
-                    'change_type'          => 'promotion',
-                    'agent_stats_snapshot' => $snapshot,
-                    'status'               => 'pending',
-                ]);
-                $stats['pending_promotions']++;
-            }
-        }
+        // [7] مصالحة/إنشاء طلب تغيير النادي — تتعافى تلقائياً من تصادم التزامن
+        // (مثلاً self-sync يعالج نفس الوكيل في نفس اللحظة عبر عملية PHP منفصلة)
+        $request = ClubChangeRequest::syncPendingRequest(
+            $agent,
+            $changeType,
+            $changeType === 'promotion' ? $agent->current_club_id : $currentClub?->club_id,
+            $changeType === 'promotion' ? $bestClub->club_id      : $bestClub?->club_id,
+            $snapshot,
+            $this->import->import_id
+        );
 
-        // ── DEMOTION مكتشف ──────────────────────────────────────────────────
-        elseif ($currentClub && $newOrder < $currentOrder) {
-            if ($existingPending) {
-                if ($existingPending->change_type === 'demotion') {
-                    // نفس الطلب — تحديث snapshot فقط
-                    $existingPending->update(['agent_stats_snapshot' => $snapshot]);
-                } else {
-                    // طلب قديم مختلف (ترقية لم تُراجَع) — إلغاء وإنشاء جديد
-                    $existingPending->update(['status' => 'auto_cancelled']);
-                    ClubChangeRequest::create([
-                        'agent_id'             => $agent->agent_id,
-                        'import_id'            => $this->import->import_id,
-                        'from_club_id'         => $currentClub->club_id,
-                        'to_club_id'           => $bestClub?->club_id,
-                        'change_type'          => 'demotion',
-                        'agent_stats_snapshot' => $snapshot,
-                        'status'               => 'pending',
-                    ]);
-                    $stats['pending_demotions']++;
-                }
-            } else {
-                ClubChangeRequest::create([
-                    'agent_id'             => $agent->agent_id,
-                    'import_id'            => $this->import->import_id,
-                    'from_club_id'         => $currentClub->club_id,
-                    'to_club_id'           => $bestClub?->club_id,
-                    'change_type'          => 'demotion',
-                    'agent_stats_snapshot' => $snapshot,
-                    'status'               => 'pending',
-                ]);
-                $stats['pending_demotions']++;
-            }
-        }
-
-        // ── لا تغيير — إلغاء أي طلب لم يعد ملائماً ────────────────────────
-        else {
-            if ($existingPending) {
-                $existingPending->update(['status' => 'auto_cancelled']);
-            }
+        if ($request && $request->wasRecentlyCreated) {
+            $changeType === 'promotion' ? $stats['pending_promotions']++ : $stats['pending_demotions']++;
         }
 
         // ── BONUS OPPORTUNITIES (للوكلاء في Peak Club حالياً) ───────────────

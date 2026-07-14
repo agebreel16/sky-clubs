@@ -233,6 +233,23 @@ class ClubChangeRequestResource extends Resource
             return;
         }
 
+        // حارس idempotency: إذا كان الوكيل موجوداً بالفعل في النادي المستهدف (مثلاً طُبِّق
+        // التغيير عبر مسار آخر — AgentObserver عند تعديل يدوي — قبل مراجعة هذا الطلب)،
+        // لا تُنشئ Reward/HistoryLog مكرراً. الطلب أصبح غير ذي صلة، وليس "مُعتمَداً" فعلياً.
+        if ($agent->current_club_id === $record->to_club_id) {
+            $record->update([
+                'status'      => 'auto_cancelled',
+                'reviewed_by' => auth()->id(),
+                'reviewed_at' => now(),
+            ]);
+
+            Notification::make()
+                ->warning()
+                ->title('الوكيل بالفعل في هذه الحالة — تم إلغاء الطلب تلقائياً (طُبِّق عبر مسار آخر)')
+                ->send();
+            return;
+        }
+
         $updateData = ['entry_date' => now()];
 
         if ($record->change_type === 'promotion' && $toClub) {
