@@ -22,6 +22,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -82,44 +83,13 @@ class ClubChangeRequestResource extends Resource
                     ->badge()
                     ->color(fn ($record) => $record->change_type === 'promotion' ? 'success' : 'warning'),
 
-                TextColumn::make('reason')
+                IconColumn::make('reason')
                     ->label('السبب')
-                    ->wrap()
-                    ->getStateUsing(function (ClubChangeRequest $record) {
-                        $snapshot = $record->agent_stats_snapshot ?? [];
-                        $increase = (int) ($snapshot['campaign_increase'] ?? 0);
-                        $transfer = (int) ($snapshot['transfer_count'] ?? 0);
-
-                        if ($record->change_type === 'promotion') {
-                            $club = $record->toClub;
-                            return $club
-                                ? "حقق شروط {$club->club_name}: زيادة {$increase}/{$club->required_increase} • تحويل {$transfer}/{$club->required_transfer_count}"
-                                : '—';
-                        }
-
-                        $club = $record->fromClub;
-                        if (! $club) {
-                            return '—';
-                        }
-
-                        $unmet = [];
-                        if ($increase < $club->required_increase) {
-                            $unmet[] = "الزيادة {$increase}/{$club->required_increase}";
-                        }
-                        if ($transfer < $club->required_transfer_count) {
-                            $unmet[] = "التحويل {$transfer}/{$club->required_transfer_count}";
-                        }
-
-                        return $unmet
-                            ? 'لم يعد يحقق: ' . implode(' و', $unmet)
-                            : "لم يعد ضمن {$club->club_name}";
-                    }),
-
-                TextColumn::make('agent_stats_snapshot.campaign_increase')
-                    ->label('إجمالي الزيادة')
-                    ->suffix(' خط')
-                    ->numeric()
-                    ->sortable(false),
+                    ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                    ->color(fn ($record) => $record->change_type === 'promotion' ? 'success' : 'danger')
+                    ->alignCenter()
+                    ->getStateUsing(fn () => true)
+                    ->tooltip(fn (ClubChangeRequest $record) => static::reasonText($record)),
 
                 TextColumn::make('status')
                     ->label('الحالة')
@@ -251,6 +221,37 @@ class ClubChangeRequestResource extends Resource
                     }),
             ])
             ->poll('30s');
+    }
+
+    protected static function reasonText(ClubChangeRequest $record): string
+    {
+        $snapshot = $record->agent_stats_snapshot ?? [];
+        $increase = (int) ($snapshot['campaign_increase'] ?? 0);
+        $transfer = (int) ($snapshot['transfer_count'] ?? 0);
+
+        if ($record->change_type === 'promotion') {
+            $club = $record->toClub;
+            return $club
+                ? "حقق شروط {$club->club_name}: زيادة {$increase}/{$club->required_increase} • تحويل {$transfer}/{$club->required_transfer_count}"
+                : '—';
+        }
+
+        $club = $record->fromClub;
+        if (! $club) {
+            return '—';
+        }
+
+        $unmet = [];
+        if ($increase < $club->required_increase) {
+            $unmet[] = "الزيادة {$increase}/{$club->required_increase}";
+        }
+        if ($transfer < $club->required_transfer_count) {
+            $unmet[] = "التحويل {$transfer}/{$club->required_transfer_count}";
+        }
+
+        return $unmet
+            ? 'لم يعد يحقق: ' . implode(' و', $unmet)
+            : "لم يعد ضمن {$club->club_name}";
     }
 
     protected static function approveRequest(ClubChangeRequest $record, bool $silent = false): void
