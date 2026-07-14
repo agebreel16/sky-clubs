@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\AgentResource;
 use App\Filament\Resources\ClubChangeRequestResource\Pages;
 use App\Models\Agent;
 use App\Models\AgentNotification;
@@ -81,15 +82,43 @@ class ClubChangeRequestResource extends Resource
                     ->badge()
                     ->color(fn ($record) => $record->change_type === 'promotion' ? 'success' : 'warning'),
 
+                TextColumn::make('reason')
+                    ->label('السبب')
+                    ->wrap()
+                    ->getStateUsing(function (ClubChangeRequest $record) {
+                        $snapshot = $record->agent_stats_snapshot ?? [];
+                        $increase = (int) ($snapshot['campaign_increase'] ?? 0);
+                        $transfer = (int) ($snapshot['transfer_count'] ?? 0);
+
+                        if ($record->change_type === 'promotion') {
+                            $club = $record->toClub;
+                            return $club
+                                ? "حقق شروط {$club->club_name}: زيادة {$increase}/{$club->required_increase} • تحويل {$transfer}/{$club->required_transfer_count}"
+                                : '—';
+                        }
+
+                        $club = $record->fromClub;
+                        if (! $club) {
+                            return '—';
+                        }
+
+                        $unmet = [];
+                        if ($increase < $club->required_increase) {
+                            $unmet[] = "الزيادة {$increase}/{$club->required_increase}";
+                        }
+                        if ($transfer < $club->required_transfer_count) {
+                            $unmet[] = "التحويل {$transfer}/{$club->required_transfer_count}";
+                        }
+
+                        return $unmet
+                            ? 'لم يعد يحقق: ' . implode(' و', $unmet)
+                            : "لم يعد ضمن {$club->club_name}";
+                    }),
+
                 TextColumn::make('agent_stats_snapshot.campaign_increase')
                     ->label('إجمالي الزيادة')
                     ->suffix(' خط')
                     ->numeric()
-                    ->sortable(false),
-
-                TextColumn::make('agent_stats_snapshot.transfer_pct')
-                    ->label('نسبة التحويل')
-                    ->suffix('%')
                     ->sortable(false),
 
                 TextColumn::make('status')
@@ -136,6 +165,14 @@ class ClubChangeRequestResource extends Resource
                     ]),
             ])
             ->actions([
+                Action::make('view_agent')
+                    ->label('عرض الوكيل')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('gray')
+                    ->url(fn (ClubChangeRequest $record) => AgentResource::getUrl('view', ['record' => $record->agent_id]))
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => $record->agent_id !== null),
+
                 Action::make('approve')
                     ->label('قبول')
                     ->icon('heroicon-o-check-circle')
