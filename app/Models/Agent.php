@@ -23,6 +23,7 @@ class Agent extends Model
         'baseline_count',
         'pre_campaign_count',
         'current_total',
+        'true_active_subs',
         'transfer_count',
         'new_line_count',
         'current_club_id',
@@ -127,5 +128,20 @@ class Agent extends Model
     public function getBaselineLossAttribute(): int
     {
         return $this->baseline_count - $this->pre_campaign_count;
+    }
+
+    /**
+     * تراجع الوكيل الحقيقي عن بداية الحملة، من true_active_subs (بدون Floor) —
+     * بعكس campaign_increase المحمي بـ max(0, ...) وcurrent_total المحمي عند
+     * pre_campaign_count. موجب = خسارة فعلية، صفر أو سالب = لا تراجع.
+     * null إذا لم تتم أي مزامنة عبر Deals API بعد لهذا الوكيل.
+     */
+    public function getTrueDeficitAttribute(): ?int
+    {
+        if ($this->true_active_subs === null) {
+            return null;
+        }
+
+        return $this->baseline_count - $this->true_active_subs;
     }
 }

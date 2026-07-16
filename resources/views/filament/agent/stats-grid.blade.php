@@ -66,6 +66,19 @@
 @media (max-width: 640px) {
     .sc-tiles-row { grid-template-columns: 1fr; gap: 8px; }
 }
+.sc-decline-warn {
+    margin-top: 16px;
+    padding: 14px 18px;
+    border-radius: var(--sc-radius);
+    background: color-mix(in oklch, var(--sc-red) 8%, transparent);
+    border: 1px solid color-mix(in oklch, var(--sc-red) 30%, transparent);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.sc-decline-warn-icon { flex-shrink: 0; color: var(--sc-red); }
+.sc-decline-warn-title { font-weight: 800; color: var(--sc-red); font-size: 14px; }
+.sc-decline-warn-sub { font-size: 12px; color: var(--sc-text3); margin-top: 3px; }
 @endverbatim
 </style>
 
@@ -101,3 +114,15 @@
         </div>
     @endforeach
 </div>
+
+@if($agent->true_deficit !== null && $agent->true_deficit > 0)
+    <div class="sc-decline-warn">
+        <div class="sc-decline-warn-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+        </div>
+        <div>
+            <div class="sc-decline-warn-title">تراجع عن بداية الحملة — خسر {{ number_format($agent->true_deficit) }} خط</div>
+
+        </div>
+    </div>
+@endif

@@ -384,9 +384,16 @@ class AgentResource extends Resource
                         'not_started' => 'لم يبدأ بعد',
                         'in_progress' => 'في الطريق',
                         'near_door'   => 'على الأعتاب',
+                        'net_loss'    => 'تراجع عن الأساس',
                     ])
                     ->query(function (Builder $query, array $data): void {
                         if (blank($data['value'])) return;
+
+                        if ($data['value'] === 'net_loss') {
+                            $query->whereNotNull('true_active_subs')
+                                  ->whereColumn('true_active_subs', '<', 'baseline_count');
+                            return;
+                        }
 
                         $pendingIds = ClubChangeRequest::where('status', 'pending')
                             ->where('change_type', 'promotion')
@@ -396,12 +403,27 @@ class AgentResource extends Resource
                               ->where('is_violator', false)
                               ->whereNotIn('agent_id', $pendingIds);
 
-                        match ($data['value']) {
-                            'not_started' => $query->where('transfer_count', '=', 0),
-                            'in_progress' => $query->whereBetween('transfer_count', [1, 9]),
-                            'near_door'   => $query->where('transfer_count', '>=', 10),
-                            default       => null,
-                        };
+                        if ($data['value'] === 'not_started') {
+                            $query->where('transfer_count', '=', 0);
+                            return;
+                        }
+
+                        $query->where('transfer_count', '>', 0);
+
+                        // "في الطريق"/"على الأعتاب" موحّدتان على نفس شرطي الترقية الفعليين
+                        // مقابل أول نادٍ نشط — راجع Club::readinessScoreFor().
+                        $club1 = Club::where('is_active', true)->orderBy('club_order')->first();
+                        if (! $club1) return;
+
+                        $matchingIds = Agent::whereNull('current_club_id')
+                            ->where('is_violator', false)
+                            ->whereNotIn('agent_id', $pendingIds)
+                            ->where('transfer_count', '>', 0)
+                            ->get(['agent_id', 'current_total', 'baseline_count', 'transfer_count'])
+                            ->filter(fn (Agent $agent) => ($club1->readinessScoreFor($agent) >= 70) === ($data['value'] === 'near_door'))
+                            ->pluck('agent_id');
+
+                        $query->whereIn('agent_id', $matchingIds);
                     }),
             ])
             ->actions([

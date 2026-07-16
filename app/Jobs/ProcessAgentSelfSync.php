@@ -112,9 +112,10 @@ class ProcessAgentSelfSync implements ShouldQueue
         $totals = DealsApiCalculator::computeTotals($activeSubs, $transfers, (int) $agent->pre_campaign_count, (int) $agent->baseline_count);
 
         $agent->update([
-            'transfer_count' => $totals['transfer_count'],
-            'new_line_count' => $totals['new_line_count'],
-            'current_total'  => $totals['current_total'],
+            'transfer_count'   => $totals['transfer_count'],
+            'new_line_count'   => $totals['new_line_count'],
+            'current_total'    => $totals['current_total'],
+            'true_active_subs' => $totals['true_active_subs'],
         ]);
 
         // تحديث snapshot اليوم إن وُجد من import سابق — لا ننشئ snapshot جديداً لأن import_id NOT NULL

@@ -1,27 +1,24 @@
 {{-- بطاقة نقاط شروط النادي — تُستخدم لكل من "المحافظة على النادي الحالي" و"الهدف القادم".
-     تستقبل: $score (ناتج $scoreFor)، $eyebrow، $metText، $unmetText --}}
+     تستقبل: $score (ناتج $scoreFor)، $eyebrow، $metText، $unmetText، $variant ('maintain' أو 'next') --}}
 @php
-    $scoreColor = match(true) {
-        $score['total'] >= 100 => '#10b981',
-        $score['total'] >= 70  => '#0ea5e9',
-        $score['total'] >= 40  => '#f59e0b',
-        default                 => '#ef4444',
-    };
+    $isFullyMet = $score['incMet'] && $score['transMet'];
+    $state = $isFullyMet ? 'success' : ($variant === 'maintain' ? 'warning' : 'active');
+    $stateVar = $state === 'success' ? 'success' : ($state === 'active' ? 'primary' : 'warning');
     $rows = [
-        ['label' => 'الخطوط داخل الحملة', 'val' => $score['incVal'],   'req' => $score['reqInc'],   'pts' => $score['incPts'],   'met' => $score['incMet'],   'show' => true],
-        ['label' => 'خطوط التحويل',       'val' => $score['transVal'], 'req' => $score['reqTrans'], 'pts' => $score['transPts'], 'met' => $score['transMet'], 'show' => $score['showTrans']],
+        ['label' => 'الخطوط داخل الحملة', 'val' => $score['incVal'],   'req' => $score['reqInc'],   'met' => $score['incMet'],   'show' => true],
+        ['label' => 'خطوط التحويل',       'val' => $score['transVal'], 'req' => $score['reqTrans'], 'met' => $score['transMet'], 'show' => $score['showTrans']],
     ];
 @endphp
-<div class="card card-pad score-card" style="border-top:3px solid {{ $scoreColor }};">
+<div class="card score-card score-card--{{ $state }} @if($variant === 'next') score-card--priority @endif">
     <div class="score-head">
         <div>
             <div class="score-eyebrow">{{ $eyebrow }}</div>
             <div class="score-club">{{ $score['club']->club_name }}</div>
         </div>
-        <div class="score-ring" style="background:conic-gradient({{ $scoreColor }} {{ $score['total'] }}%, var(--slate-200) 0);">
+        <div class="score-ring" style="background:conic-gradient(var(--{{ $stateVar }}) {{ $score['pct'] }}%, var(--slate-200) 0);">
             <div class="score-ring-inner">
-                <div class="score-ring-num" style="color:{{ $scoreColor }};">{{ $score['total'] }}</div>
-                <div class="score-ring-den">/100</div>
+                <div class="score-ring-num js-countup" style="color:var(--{{ $stateVar }});">{{ number_format($score['totalAchieved']) }}</div>
+                <div class="score-ring-den">/{{ number_format($score['totalRequired']) }} خط</div>
             </div>
         </div>
     </div>
@@ -33,18 +30,20 @@
                 <div class="score-row">
                     <div class="score-row-head">
                         <span class="score-row-label">{{ $row['label'] }}</span>
-                        <span class="score-row-pts" style="color:{{ $row['met'] ? '#16a34a' : '#ea580c' }};">{{ $row['pts'] }}/50 نقطة</span>
+                        <span class="score-badge {{ $row['met'] ? 'score-badge--done' : 'score-badge--warn' }}">
+                            {{ $row['met'] ? '✓ مكتمل' : 'متبقي ' . number_format(max(0, $row['req'] - $row['val'])) }}
+                        </span>
                     </div>
                     <div class="score-row-val">{{ number_format($row['val']) }} / {{ number_format($row['req']) }}</div>
                     <div class="score-row-bar">
-                        <div class="score-row-fill" style="width:0%;background:{{ $row['met'] ? '#10b981' : '#f59e0b' }};" data-fill-width="{{ $rowPct }}%"></div>
+                        <div class="score-row-fill" style="background:{{ $row['met'] ? 'var(--success)' : 'var(--warning)' }};" data-fill-width="{{ $rowPct }}%"></div>
                     </div>
                 </div>
             @endif
         @endforeach
     </div>
 
-    <div class="score-foot" style="color:{{ $score['total'] >= 100 ? '#16a34a' : '#ea580c' }};background:{{ $score['total'] >= 100 ? '#f0fdf4' : '#fff7ed' }};">
-        {{ $score['total'] >= 100 ? $metText : $unmetText }}
+    <div class="score-foot {{ $isFullyMet ? 'score-foot--done' : 'score-foot--warn' }}">
+        {{ $isFullyMet ? $metText : $unmetText }}
     </div>
 </div>

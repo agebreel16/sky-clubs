@@ -25,6 +25,7 @@ class ClubChangeRequest extends Model
         'reviewed_by',
         'reviewed_at',
         'rejection_reason',
+        'approval_note',
     ];
 
     protected function casts(): array

@@ -53,9 +53,10 @@ class DealsApiCalculatorTest extends TestCase
 
         // campaign_increase = 130 - 100 = 30 ; new_line_count = 30 - 20 = 10
         $this->assertEquals([
-            'current_total'  => 130,
-            'new_line_count' => 10,
-            'transfer_count' => 20,
+            'current_total'    => 130,
+            'new_line_count'   => 10,
+            'transfer_count'   => 20,
+            'true_active_subs' => 130,
         ], $result);
     }
 
@@ -73,6 +74,8 @@ class DealsApiCalculatorTest extends TestCase
         $result = DealsApiCalculator::computeTotals(activeSubs: 2944, transfers: 0, preCampaignCount: 3106, baselineCount: 3106);
 
         $this->assertEquals(3106, $result['current_total']);
+        // true_active_subs يحافظ على الرقم الحقيقي بدون Floor — هون التراجع الحقيقي = 3106 - 2944 = 162
+        $this->assertEquals(2944, $result['true_active_subs']);
     }
 
     public function test_compute_totals_new_line_count_plus_transfers_equals_campaign_increase(): void

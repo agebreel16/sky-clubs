@@ -41,12 +41,34 @@ class CampaignFunnelWidget extends Widget
             ->where('transfer_count', '=', 0)
             ->count();
 
-        $inProgress = (clone $outsideQuery)
-            ->whereBetween('transfer_count', [1, 9])
-            ->count();
+        // "في الطريق" و"على الأعتاب" موحّدتان الآن على نفس شرطي الترقية الفعليين
+        // (إجمالي الزيادة + خطوط التحويل مقابل متطلبات أول نادٍ) بدل الاعتماد على
+        // عدد خطوط التحويل وحده — راجع Club::readinessScoreFor().
+        $inProgress = 0;
+        $nearDoor   = 0;
 
-        $nearDoor = (clone $outsideQuery)
-            ->where('transfer_count', '>=', 10)
+        if ($club1) {
+            $remainingOutside = (clone $outsideQuery)
+                ->where('transfer_count', '>', 0)
+                ->get(['agent_id', 'current_total', 'baseline_count', 'transfer_count']);
+
+            foreach ($remainingOutside as $agent) {
+                if ($club1->readinessScoreFor($agent) >= 70) {
+                    $nearDoor++;
+                } else {
+                    $inProgress++;
+                }
+            }
+        } else {
+            $inProgress = (clone $outsideQuery)->where('transfer_count', '>', 0)->count();
+        }
+
+        // تراجع عن الأساس: الرقم الحي الحقيقي (true_active_subs، بدون Floor) أقل من
+        // baseline_count — بعكس current_total المحمي دائماً عند pre_campaign_count
+        // فما ينزل تحته أبداً حتى لو خسر الوكيل خطوطه فعلياً. بغض النظر عن حالة النادي.
+        // (null = لم تتم أي مزامنة Deals API بعد لهذا الوكيل — يُستثنى من العدّ)
+        $netLossCount = Agent::whereNotNull('true_active_subs')
+            ->whereColumn('true_active_subs', '<', 'baseline_count')
             ->count();
 
         // Agents inside clubs (non-violators)
@@ -121,6 +143,15 @@ class CampaignFunnelWidget extends Widget
             'bg'    => 'oklch(0.65 0.22 25 / 0.10)',
             'icon'  => 'ban',
             'url'   => '/admin/agents?tableFilters[is_violator][value]=1',
+        ];
+
+        $stages[] = [
+            'label' => 'تراجع عن الأساس',
+            'count' => $netLossCount,
+            'color' => 'var(--sc-red)',
+            'bg'    => 'oklch(0.65 0.22 25 / 0.10)',
+            'icon'  => 'trending-down',
+            'url'   => '/admin/agent-filter/net_loss',
         ];
 
         return [

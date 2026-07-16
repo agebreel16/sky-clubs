@@ -238,10 +238,11 @@ class ProcessDataImport implements ShouldQueue
                 $totals     = DealsApiCalculator::computeTotals($activeSubs, $transfers, (int) $agent->pre_campaign_count, (int) $agent->baseline_count);
 
                 $data[] = [
-                    'agent_id'       => $agent->agent_id,
-                    'new_line_count' => $totals['new_line_count'],
-                    'transfer_count' => $totals['transfer_count'],
-                    'current_total'  => $totals['current_total'],
+                    'agent_id'         => $agent->agent_id,
+                    'new_line_count'   => $totals['new_line_count'],
+                    'transfer_count'   => $totals['transfer_count'],
+                    'current_total'    => $totals['current_total'],
+                    'true_active_subs' => $totals['true_active_subs'],
                 ];
             }
 
@@ -349,6 +350,12 @@ class ProcessDataImport implements ShouldQueue
             $newPre     = min($agent->pre_campaign_count, $sourcePre);
             $updateData['pre_campaign_count'] = $newPre;
             $floorValue = $newPre;
+        }
+
+        // true_active_subs: الرقم الحقيقي بدون Floor (من Deals API فقط) — للمراقبة،
+        // لا يدخل بأي حساب ترقية/تهبيط.
+        if (isset($row['true_active_subs'])) {
+            $updateData['true_active_subs'] = max(0, (int) $row['true_active_subs']);
         }
 
         $updateData['current_total'] = max($floorValue, $importedTotal);

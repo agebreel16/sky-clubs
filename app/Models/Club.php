@@ -75,4 +75,22 @@ class Club extends Model
     {
         return $this->getActiveAgentsCountAttribute() >= $this->seat_capacity;
     }
+
+    /**
+     * نقاط جاهزية الوكيل لهذا النادي من 100 — 50 نقطة لكل من شرطي الترقية
+     * (إجمالي الزيادة، خطوط التحويل)، تناسبياً حسب مدى تحقيق المطلوب.
+     * نفس صيغة النقاط المستخدمة ببطاقات "المحافظة/الهدف القادم" في بوابة الوكيل.
+     */
+    public function readinessScoreFor(Agent $agent): int
+    {
+        $reqInc   = (int) $this->required_increase;
+        $reqTrans = (int) ($this->required_transfer_count ?? 0);
+        $incVal   = (int) $agent->campaign_increase;
+        $transVal = (int) $agent->transfer_count;
+
+        $incPts   = $reqInc > 0 ? min(50, (int) round(50 * $incVal / $reqInc)) : 50;
+        $transPts = $reqTrans > 0 ? min(50, (int) round(50 * $transVal / $reqTrans)) : 50;
+
+        return $incPts + $transPts;
+    }
 }

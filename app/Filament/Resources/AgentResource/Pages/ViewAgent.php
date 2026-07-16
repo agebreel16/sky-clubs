@@ -158,13 +158,13 @@ class ViewAgent extends ViewRecord
         $tiles = [
 
             [
-                'value' => number_format($record->pre_campaign_count),
+                'value' => number_format($record->baseline_count),
                 'label' => 'الخطوط قبل الحملة',
                 'color' => 'var(--sc-text3)',
                 'icon'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>',
             ],
             [
-                'value' => number_format($record->current_total),
+                'value' => number_format($record->true_active_subs),
                 'label' => 'الإجمالي حتى الآن',
                 'color' => 'var(--sc-accent)',
                 'icon'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
@@ -315,6 +315,7 @@ class ViewAgent extends ViewRecord
                         ->viewData(fn (Agent $record) => [
                             'tiles'    => $this->statsTiles($record),
                             'equation' => $this->campaignEquation($record),
+                            'agent'    => $record,
                         ])
                         ->columnSpanFull(),
                 ]),

@@ -45,7 +45,12 @@ final class DealsApiCalculator
      * دائماً (طالما transfer_count <= campaign_increase) — مطابق لصيغة
      * Agent::getCampaignIncreaseAttribute() تماماً (مصدر حقيقة واحد).
      *
-     * @return array{current_total: int, new_line_count: int, transfer_count: int}
+     * current_total محمي دائماً بـ Floor عند pre_campaign_count (TD-012) فلا يعكس
+     * تراجعاً حقيقياً لو خسر الوكيل خطوطاً قديمة. true_active_subs هو نفس $activeSubs
+     * بدون أي Floor — يُخزَّن بجانب current_total فقط للمراقبة (تراجع عن الأساس)،
+     * ولا يُستخدم إطلاقاً بمنطق الترقية/التهبيط.
+     *
+     * @return array{current_total: int, new_line_count: int, transfer_count: int, true_active_subs: int}
      */
     public static function computeTotals(int $activeSubs, int $transfers, int $preCampaignCount, int $baselineCount): array
     {
@@ -53,9 +58,10 @@ final class DealsApiCalculator
         $campaignIncrease = max(0, $currentTotal - $baselineCount);
 
         return [
-            'current_total'  => $currentTotal,
-            'new_line_count' => max(0, $campaignIncrease - $transfers),
-            'transfer_count' => $transfers,
+            'current_total'    => $currentTotal,
+            'new_line_count'   => max(0, $campaignIncrease - $transfers),
+            'transfer_count'   => $transfers,
+            'true_active_subs' => $activeSubs,
         ];
     }
 

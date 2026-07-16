@@ -36,7 +36,7 @@ Route::prefix('agent/{uuid}')
 
 // Admin: set funnel stage filter via session then redirect
 Route::get('/admin/agent-filter/{stage}', function (string $stage) {
-    $allowed = ['not_started', 'in_progress', 'near_door'];
+    $allowed = ['not_started', 'in_progress', 'near_door', 'net_loss'];
     if (! in_array($stage, $allowed)) {
         return redirect('/admin/agents');
     }

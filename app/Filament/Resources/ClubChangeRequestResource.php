@@ -12,6 +12,7 @@ use App\Models\HistoryLog;
 use App\Models\Opportunity;
 use App\Models\Reward;
 use App\Notifications\AgentPortalNotification;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
@@ -107,9 +109,23 @@ class ClubChangeRequestResource extends Resource
                         'auto_cancelled' => 'ملغى',
                     }),
 
+                IconColumn::make('review_note')
+                    ->label('ملاحظة المراجعة')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color(fn ($record) => $record->status === 'rejected' ? 'danger' : 'success')
+                    ->alignCenter()
+                    ->getStateUsing(fn () => true)
+                    ->tooltip(fn (ClubChangeRequest $record) => $record->rejection_reason ?: ($record->approval_note ?: '—')),
+
                 TextColumn::make('reviewer.name')
                     ->label('راجعه')
                     ->default('—'),
+
+                TextColumn::make('reviewed_at')
+                    ->label('تاريخ المراجعة')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->placeholder('—'),
 
                 TextColumn::make('created_at')
                     ->label('تاريخ الاكتشاف')
@@ -117,22 +133,22 @@ class ClubChangeRequestResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->label('الحالة')
-                    ->options([
-                        'pending'        => 'معلّق',
-                        'approved'       => 'مقبول',
-                        'rejected'       => 'مرفوض',
-                        'auto_cancelled' => 'ملغى',
-                    ])
-                    ->default('pending'),
-
                 SelectFilter::make('change_type')
                     ->label('النوع')
                     ->options([
                         'promotion' => 'ترقية',
                         'demotion'  => 'تهبيط',
                     ]),
+
+                Filter::make('created_at')
+                    ->label('تاريخ الإنشاء')
+                    ->form([
+                        DatePicker::make('from')->label('من التاريخ'),
+                        DatePicker::make('until')->label('إلى التاريخ'),
+                    ])
+                    ->query(fn ($query, array $data) => $query
+                        ->when($data['from'], fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
+                        ->when($data['until'], fn ($q, $d) => $q->whereDate('created_at', '<=', $d))),
             ])
             ->actions([
                 Action::make('view_agent')
@@ -147,14 +163,19 @@ class ClubChangeRequestResource extends Resource
                     ->label('قبول')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->requiresConfirmation()
                     ->modalWidth('md')
                     ->modalAlignment(\Filament\Support\Enums\Alignment::Center)
                     ->modalHeading('تأكيد القبول')
                     ->modalDescription('سيُطبَّق تغيير النادي فوراً على حساب الوكيل.')
                     ->visible(fn ($record) => $record->status === 'pending')
-                    ->action(function (ClubChangeRequest $record) {
-                        static::approveRequest($record);
+                    ->form([
+                        Textarea::make('approval_note')
+                            ->label('ملاحظة (اختياري)')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])
+                    ->action(function (ClubChangeRequest $record, array $data) {
+                        static::approveRequest($record, data: $data);
                     }),
 
                 Action::make('reject')
@@ -254,7 +275,7 @@ class ClubChangeRequestResource extends Resource
             : "لم يعد ضمن {$club->club_name}";
     }
 
-    protected static function approveRequest(ClubChangeRequest $record, bool $silent = false): void
+    protected static function approveRequest(ClubChangeRequest $record, bool $silent = false, array $data = []): void
     {
         // حارس ضد double-approve (race condition أو تحديث الصفحة المزدوج)
         $fresh = $record->fresh();
@@ -303,7 +324,7 @@ class ClubChangeRequestResource extends Resource
                 'event_type'      => 'promotion',
                 'from_club_id'    => $record->from_club_id,
                 'to_club_id'      => $toClub->club_id,
-                'reason'          => 'قبول طلب الترقية من قِبَل الإدارة',
+                'reason'          => ($data['approval_note'] ?? null) ?: 'قبول طلب الترقية من قِبَل الإدارة',
                 'event_timestamp' => now(),
             ]);
 
@@ -378,7 +399,7 @@ class ClubChangeRequestResource extends Resource
                 'event_type'      => 'demotion',
                 'from_club_id'    => $record->from_club_id,
                 'to_club_id'      => $record->to_club_id,
-                'reason'          => 'قبول طلب التهبيط من قِبَل الإدارة',
+                'reason'          => ($data['approval_note'] ?? null) ?: 'قبول طلب التهبيط من قِبَل الإدارة',
                 'event_timestamp' => now(),
             ]);
 
@@ -404,9 +425,10 @@ class ClubChangeRequestResource extends Resource
         }
 
         $record->update([
-            'status'      => 'approved',
-            'reviewed_by' => auth()->id(),
-            'reviewed_at' => now(),
+            'status'        => 'approved',
+            'reviewed_by'   => auth()->id(),
+            'reviewed_at'   => now(),
+            'approval_note' => $data['approval_note'] ?? null,
         ]);
 
         if (! $silent) {
@@ -489,7 +511,8 @@ class ClubChangeRequestResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListClubChangeRequests::route('/'),
+            'index'   => Pages\ListClubChangeRequests::route('/'),
+            'archive' => Pages\ArchivedClubChangeRequests::route('/archive'),
         ];
     }
 

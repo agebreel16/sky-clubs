@@ -34,7 +34,7 @@
 | الجدول | PK | FK المهمة | الغرض |
 |---|---|---|---|
 | `clubs` | `club_id` (UUID) | — | إعداد الأندية الثلاثة — مركز التحكم الديناميكي |
-| `agents` | `agent_id` (UUID) | `current_club_id → clubs`, `distributor_id → distributors` | كيان الوكيل + أرقامه الحالية. يحتوي `portal_token` (64 hex, nullable unique) لبوابة الوكيل. حقل `last_self_sync_at` (timestamp nullable) لآخر مزامنة ذاتية من البوابة. حقول المخالف: `is_violator`, `violator_since`, `violator_reason` |
+| `agents` | `agent_id` (UUID) | `current_club_id → clubs`, `distributor_id → distributors` | كيان الوكيل + أرقامه الحالية. يحتوي `portal_token` (64 hex, nullable unique) لبوابة الوكيل. حقل `last_self_sync_at` (timestamp nullable) لآخر مزامنة ذاتية من البوابة. حقول المخالف: `is_violator`, `violator_since`, `violator_reason`. حقل `true_active_subs` (unsignedInteger nullable، TD-016) — الرقم الحي الحقيقي من Deals API بدون Floor، للمراقبة فقط (لا يدخل بمنطق الترقية/التهبيط) |
 | `club_change_requests` | `id` (UUID) | `agent_id → agents` (CASCADE), `import_id → data_imports` (SET NULL), `from_club_id / to_club_id → clubs` (SET NULL), `reviewed_by → users` (SET NULL) | طلبات تغيير النادي المعلّقة — الاستيراد يُنشئها، الأدمن يراجعها |
 | `distributors` | `id` (UUID) | — | الموزعون (بيانات تسجيل الدخول + ربط الوكلاء) |
 | `rewards` | `reward_id` (UUID) | `agent_id → agents`, `club_id → clubs` | المكافآت المالية (دخول النادي + الأوائل) |
@@ -851,6 +851,25 @@ Admin يفتح /admin/club-change-requests:
 ---
 
 ## 8. Technical Debt
+
+### ~~TD-016~~: ✅ مُضاف — `true_active_subs`: الرقم الحي بدون Floor لرصد التراجع الحقيقي (2026-07-14)
+
+**المشكلة المكتشفة:** ودجت "رحلة الوكلاء في الحملة" (`CampaignFunnelWidget`) كان فيه خانة "تراجع عن الأساس" تقارن `current_total < baseline_count` — طلعت دايماً ~0 تقريباً. السبب: `current_total = max(pre_campaign_count, active_subs)` (Floor مقصود، TD-012) بيمنعه ينزل تحت `pre_campaign_count`، و`pre_campaign_count` لا يتحدّث أبداً عبر المزامنة الدورية (`readDealsApi()` لا يُرجِع هذا المفتاح بصفوفها) — فيبقى ثابتاً عملياً عند `baseline_count` للأبد.
+
+**فحص مباشر على الـ API الحي (553 وكيل، بدون Floor):** **236 من 553 وكيل (43%)** عندهم `active_subs` حقيقي أقل من `baseline_count` — تراجع حقيقي بالكامل مخفي عن كل الحقول المخزَّنة (`current_total`، `campaign_increase`). تحقّق أيضاً عبر `AuditLog` لوكيل حقيقي (`مازن صلاح`، baseline=3106): مزامنتان ناجحتان متتاليتان لم تُغيّرا `current_total` إطلاقاً رغم أن الـ API الحي كان يُرجِع 2870-2876 — الفلترة تعمل صح 100%، بس تصميم الـ Floor يمنعها من الظهور.
+
+**القرار:** إضافة عمود جديد `agents.true_active_subs` (nullable، migration `2026_07_14_000001`) يخزّن نفس قيمة `active_subs` **بدون أي Floor** — بجانب `current_total` المحمي، وليس بديلاً عنه. **لا يدخل إطلاقاً بمنطق الترقية/التهبيط** (`campaign_increase`, `bestClub` matching) — للمراقبة فقط.
+
+**التنفيذ:**
+- `DealsApiCalculator::computeTotals()` يُرجِع مفتاحاً رابعاً `true_active_subs` (نفس `$activeSubs` كما استُقبل، بدون تعديل).
+- `ProcessDataImport::readDealsApi()` يضيف `true_active_subs` لكل صف، و`processAgentRow()` يحفظه إذا كان موجوداً بالصف (مطابق لنمط `pre_campaign_count` الموجود).
+- `ProcessAgentSelfSync::processRow()` يحفظه أيضاً (نفس مصدر الحقيقة `computeTotals()`).
+- `Agent::getTrueDeficitAttribute()` = `baseline_count - true_active_subs` (يُسمح له بالسالب = لا تراجع؛ `null` إذا لم تتم أي مزامنة Deals API بعد).
+- `CampaignFunnelWidget` وفلتر `funnel_stage=net_loss` في `AgentResource` عُدِّلا ليقارنا `true_active_subs` بدل `current_total` (مع `whereNotNull` لاستثناء من لم يُزامَن بعد).
+
+**اختبارات:** `DealsApiCalculatorTest` (مفتاح رابع بكل الحالات + حالة TD-012 الموثَّقة أصلاً: `active_subs=2944, baseline=3106 → true_active_subs=2944` رغم `current_total=3106`).
+
+---
 
 ### ~~TD-015~~: ✅ مُصلَح — إغلاق TD-012 بطلب صريح: new_line_count يُشتَق من campaign_increase (2026-07-13)
 
